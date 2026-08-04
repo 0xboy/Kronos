@@ -26,7 +26,7 @@ Your CSV file must contain the following columns:
 | 2019/11/26 9:40 | 184.35215 | 183.85215 | 184.55215 | 183.45215 | 4433300 | 0 |
 | 2019/11/26 9:45 | 183.85215 | 183.35215 | 183.95215 | 182.95215 | 3070900 | 0 |
 
-> **Reference**: Check `data/HK_ali_09988_kline_5min_all.csv` for a complete example of the proper data format.
+> **Reference**: Check `data/samples/HK_ali_09988_kline_5min_all.csv` for a complete example of the proper data format.
 
 
 ## 2. Config Preparation

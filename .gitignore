@@ -74,3 +74,9 @@ venv.bak/
 temp/
 tmp/
 .python-version
+
+# Local paper trading / research artifacts
+paper_results/
+data/yahoo_cache/
+webui/prediction_results/
+figures/demos/
