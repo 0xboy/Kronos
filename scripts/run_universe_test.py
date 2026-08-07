@@ -1,4 +1,4 @@
-"""Score Kronos on one universe at a time (SPUS50, XK100, commodities, or crypto).
+"""Score Kronos on one universe at a time (SPUS100, XK100, commodities, or crypto).
 
 Uses Yahoo data from disk cache (data/yahoo_cache/) — no re-download each run.
 Markets stay separate. Commodities are priced in TRY per gram; crypto in USD.
@@ -23,7 +23,8 @@ sys.path.insert(0, str(ROOT))
 from paper.commodities import COMMODITY_META, get_commodity_try_gram_bars
 from paper.crypto import CRYPTO_META
 from paper.signals import load_predictor, score_symbol
-from paper.universe import COMMODITIES, CRYPTO, SPUS50, XK100
+from paper.universe import COMMODITIES, CRYPTO, SPUS100, XK100
+from paper.xk100_rank import DEFAULT_CFG, cfg_to_dict, rank_signals
 from paper.yahoo_cache import get_yahoo_bars
 
 
@@ -33,6 +34,12 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--limit", type=int, default=0, help="First N symbols only (0 = all)")
     p.add_argument("--lookback", type=int, default=400)
     p.add_argument("--pred-len", type=int, default=1)
+    p.add_argument(
+        "--sample-count",
+        type=int,
+        default=0,
+        help="Kronos sample paths (0 = 1 for most markets, DEFAULT_CFG for xk100)",
+    )
     p.add_argument("--model", default="NeoQuasar/Kronos-small")
     p.add_argument("--refresh", action="store_true", help="Force Yahoo re-download")
     p.add_argument("--max-age-days", type=int, default=1)
@@ -42,11 +49,11 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     if args.universe == "spus":
-        labels = list(SPUS50)
+        labels = list(SPUS100)
         yahoo_syms = labels
         market = {
             "id": "spus",
-            "name": "SPUS ETF top 50 by weight",
+            "name": "SPUS ETF top 100 by weight",
             "exchange": "NYSE / Nasdaq",
             "currency": "USD",
             "unit": "share",
@@ -119,14 +126,50 @@ def main() -> int:
     print("Loading Kronos...")
     predictor = load_predictor(args.model)
 
+    use_xk100_rank = args.universe == "xk100"
+    if args.sample_count and args.sample_count > 0:
+        sample_count = args.sample_count
+    elif use_xk100_rank:
+        sample_count = DEFAULT_CFG.sample_count
+    else:
+        sample_count = 1
+    xk_cfg = DEFAULT_CFG if use_xk100_rank else None
+    if use_xk100_rank:
+        print(
+            f"XK100 rank cfg: min_price={xk_cfg.min_price_try} "
+            f"min_adv20={xk_cfg.min_adv20_try} max_abs_exp={xk_cfg.max_abs_expected} "
+            f"min_tstat={xk_cfg.min_tstat} sample_count={sample_count}"
+        )
+
     signals = []
     skipped = []
-    for i, symbol in enumerate(labels, 1):
+    filter_drops_pre: list[dict] = []
+    score_labels = list(labels)
+    if use_xk100_rank and xk_cfg is not None:
+        from paper.xk100_rank import passes_filters
+
+        score_labels = []
+        for symbol in labels:
+            df = bars.get(symbol)
+            if df is None:
+                skipped.append({"symbol": symbol, "reason": "no bars"})
+                continue
+            ok, reason = passes_filters(df, xk_cfg)
+            if not ok:
+                filter_drops_pre.append({"symbol": symbol, "reason": reason})
+                continue
+            score_labels.append(symbol)
+        print(
+            f"Pre-filter: scoring {len(score_labels)}/{len(labels)} "
+            f"(dropped {len(filter_drops_pre)} on price/ADV/vol)"
+        )
+
+    for i, symbol in enumerate(score_labels, 1):
         df = bars.get(symbol)
         if df is None:
             skipped.append({"symbol": symbol, "reason": "no bars"})
             continue
-        print(f"[{i}/{len(labels)}] scoring {symbol} ({len(df)} bars)...")
+        print(f"[{i}/{len(score_labels)}] scoring {symbol} ({len(df)} bars)...")
         try:
             sig = score_symbol(
                 predictor,
@@ -134,6 +177,7 @@ def main() -> int:
                 df,
                 lookback=args.lookback,
                 pred_len=args.pred_len,
+                sample_count=sample_count,
             )
         except Exception as exc:  # noqa: BLE001
             skipped.append({"symbol": symbol, "reason": str(exc)})
@@ -149,12 +193,24 @@ def main() -> int:
             f"  -> ret={sig.expected_return:+.2%} "
             f"last={sig.last_close:.4f}{(' ' + unit) if unit else ''} "
             f"pred={sig.pred_close:.4f}{(' ' + unit) if unit else ''}"
+            + (f" std={sig.return_std:.4f}" if sample_count > 1 else "")
         )
 
-    signals.sort(key=lambda s: s.expected_return, reverse=True)
-    print(f"\n=== {market['id'].upper()} ranked signals ({len(signals)}) ===")
-    for s in signals[:20]:
-        print(f"{s.symbol:10} {s.expected_return:+7.2%}")
+    filter_drops: list[dict] = list(filter_drops_pre) if use_xk100_rank else []
+    if use_xk100_rank and xk_cfg is not None:
+        signals, gate_drops = rank_signals(signals, bars, xk_cfg)
+        filter_drops.extend(gate_drops)
+        print(
+            f"\n=== {market['id'].upper()} ranked by vol_norm score "
+            f"({len(signals)} kept, {len(filter_drops)} filtered) ==="
+        )
+        for s in signals[:20]:
+            print(f"{s.symbol:10} score={s.score:+7.3f} ret={s.expected_return:+7.2%}")
+    else:
+        signals.sort(key=lambda s: s.expected_return, reverse=True)
+        print(f"\n=== {market['id'].upper()} ranked signals ({len(signals)}) ===")
+        for s in signals[:20]:
+            print(f"{s.symbol:10} {s.expected_return:+7.2%}")
 
     out = {
         "ts": datetime.now(timezone.utc).isoformat(),
@@ -162,8 +218,10 @@ def main() -> int:
         "params": {
             "lookback": args.lookback,
             "pred_len": args.pred_len,
+            "sample_count": sample_count,
             "model": args.model,
             "symbols": labels,
+            **({"xk100_rank": cfg_to_dict(xk_cfg)} if xk_cfg is not None else {}),
         },
         "signals": [
             {
@@ -179,10 +237,14 @@ def main() -> int:
                 "last_close": s.last_close,
                 "pred_close": s.pred_close,
                 "bars": s.bars,
+                "return_std": s.return_std,
+                "sample_count": s.sample_count,
+                "score": s.score,
             }
             for s in signals
         ],
         "skipped": skipped,
+        "filter_drops": filter_drops,
     }
     out_dir = ROOT / "paper_results" / "tests"
     out_dir.mkdir(parents=True, exist_ok=True)

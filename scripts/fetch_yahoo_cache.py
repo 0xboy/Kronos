@@ -1,4 +1,4 @@
-"""Fetch / check Yahoo caches for SPUS50, XK100, commodities, and crypto (separate folders).
+"""Fetch / check Yahoo caches for SPUS100, XK100, commodities, and crypto (separate folders).
 
   # download equity universes
   .venv/Scripts/python.exe scripts/fetch_yahoo_cache.py
@@ -27,7 +27,7 @@ sys.path.insert(0, str(ROOT))
 
 from paper.commodities import COMMODITY_LABELS, get_commodity_try_gram_bars
 from paper.crypto import CRYPTO_LABELS
-from paper.universe import SPUS50, XK100
+from paper.universe import SPUS100, XK100
 from paper.yahoo_cache import CACHE_ROOT, check_cache, get_yahoo_bars
 
 
@@ -47,7 +47,7 @@ def parse_args() -> argparse.Namespace:
 
 def symbols_for(universe: str) -> list[str]:
     if universe == "spus":
-        return list(SPUS50)
+        return list(SPUS100)
     if universe == "commodities":
         return list(COMMODITY_LABELS)
     if universe == "crypto":

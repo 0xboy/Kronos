@@ -7,7 +7,9 @@ daily bars gives ~730 rows — plenty for the default lookback=400.
 from __future__ import annotations
 
 # label (== Yahoo ticker) -> display name
+# Prefer numbered Yahoo feeds when the plain ticker is stale (ARB/APT/SUI/UNI).
 CRYPTO_META: dict[str, dict[str, str]] = {
+    # Majors / large caps
     "BTC-USD": {"name": "Bitcoin"},
     "ETH-USD": {"name": "Ethereum"},
     "BNB-USD": {"name": "BNB"},
@@ -39,14 +41,81 @@ CRYPTO_META: dict[str, dict[str, str]] = {
     "SAND-USD": {"name": "The Sandbox"},
     "MANA-USD": {"name": "Decentraland"},
     "SHIB-USD": {"name": "Shiba Inu"},
+    # Mid / liquid alts (Yahoo history >= ~400 bars as of 2026-08)
+    "TON-USD": {"name": "Toncoin"},
+    "INJ-USD": {"name": "Injective"},
+    "RENDER-USD": {"name": "Render"},
+    "FET-USD": {"name": "Artificial Superintelligence"},
+    "WIF-USD": {"name": "dogwifhat"},
+    "BONK-USD": {"name": "Bonk"},
+    "FLOKI-USD": {"name": "FLOKI"},
+    "SEI-USD": {"name": "Sei"},
+    "TIA-USD": {"name": "Celestia"},
+    "JUP-USD": {"name": "Jupiter"},
+    "WLD-USD": {"name": "Worldcoin"},
+    "PYTH-USD": {"name": "Pyth Network"},
+    "JTO-USD": {"name": "Jito"},
+    "ONDO-USD": {"name": "Ondo"},
+    "ENA-USD": {"name": "Ethena"},
+    "STRK-USD": {"name": "Starknet"},
+    "MKR-USD": {"name": "Maker"},
+    "SNX-USD": {"name": "Synthetix"},
+    "CRV-USD": {"name": "Curve DAO"},
+    "LDO-USD": {"name": "Lido DAO"},
+    "RUNE-USD": {"name": "THORChain"},
+    "THETA-USD": {"name": "Theta Network"},
+    "EOS-USD": {"name": "EOS"},
+    "XTZ-USD": {"name": "Tezos"},
+    "FLOW-USD": {"name": "Flow"},
+    "EGLD-USD": {"name": "MultiversX"},
+    "KAVA-USD": {"name": "Kava"},
+    "ZEC-USD": {"name": "Zcash"},
+    "DASH-USD": {"name": "Dash"},
+    "XMR-USD": {"name": "Monero"},
+    "QNT-USD": {"name": "Quant"},
+    "AXS-USD": {"name": "Axie Infinity"},
+    "CHZ-USD": {"name": "Chiliz"},
+    "ENJ-USD": {"name": "Enjin Coin"},
+    "BAT-USD": {"name": "Basic Attention"},
+    "ZIL-USD": {"name": "Zilliqa"},
+    "IOTA-USD": {"name": "IOTA"},
+    "NEO-USD": {"name": "Neo"},
+    "WAVES-USD": {"name": "Waves"},
+    "KSM-USD": {"name": "Kusama"},
+    "ROSE-USD": {"name": "Oasis"},
+    "CFX-USD": {"name": "Conflux"},
+    "MINA-USD": {"name": "Mina"},
+    "ASTR-USD": {"name": "Astar"},
+    "DYDX-USD": {"name": "dYdX"},
+    "BLUR-USD": {"name": "Blur"},
+    "APE-USD": {"name": "ApeCoin"},
+    "LPT-USD": {"name": "Livepeer"},
+    "ENS-USD": {"name": "Ethereum Name Service"},
+    "1INCH-USD": {"name": "1inch"},
+    "YFI-USD": {"name": "yearn.finance"},
+    "SUSHI-USD": {"name": "SushiSwap"},
+    "CAKE-USD": {"name": "PancakeSwap"},
+    "GALA-USD": {"name": "Gala"},
+    "KAS-USD": {"name": "Kaspa"},
+    "JASMY-USD": {"name": "JasmyCoin"},
+    "CORE-USD": {"name": "Core"},
+    "AKT-USD": {"name": "Akash"},
+    "AR-USD": {"name": "Arweave"},
+    "ONE-USD": {"name": "Harmony"},
+    "ANKR-USD": {"name": "Ankr"},
+    "SKL-USD": {"name": "Skale"},
+    "STORJ-USD": {"name": "Storj"},
+    "HOT-USD": {"name": "Holo"},
+    "QTUM-USD": {"name": "Qtum"},
+    "ZRX-USD": {"name": "0x"},
+    "BAND-USD": {"name": "Band Protocol"},
+    "IOTX-USD": {"name": "IoTeX"},
+    "PENDLE-USD": {"name": "Pendle"},
 }
 
 # Excluded / notes:
-#  - Plain "ARB-USD" on Yahoo is a stale/inactive listing (28/30 zero-volume
-#    days, price ~1000x below real Arbitrum) — use the numbered "ARB11841-USD"
-#    feed instead, which has healthy volume and a plausible price range.
-#  - "TON-USD" (Toncoin) has the same stale-feed problem, but its only
-#    numbered alternative ("TON11419-USD") has just ~2 days of history — not
-#    enough for the default lookback=400, so Toncoin is left out entirely.
+#  - Plain "ARB-USD" on Yahoo is a stale/inactive listing — use ARB11841-USD.
+#  - "TON11419-USD" has ~2 days of history; plain TON-USD is used instead.
+#  - Tickers with <400 daily bars or delisted Yahoo feeds are left out.
 
 CRYPTO_LABELS = list(CRYPTO_META.keys())

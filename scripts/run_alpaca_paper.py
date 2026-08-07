@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import math
 import sys
 import time
 from datetime import datetime, timezone
@@ -47,7 +46,8 @@ from paper.ledger import (
     save_ledger,
 )
 from paper.signals import load_predictor, score_symbol
-from paper.universe import UNIVERSE_50
+from paper.sizing import allocate_budget, conviction
+from paper.universe import UNIVERSE_100
 
 
 def seed_ledger_from_latest_run(ledger: dict, broker_syms: set[str]) -> list[str]:
@@ -102,6 +102,18 @@ def parse_args() -> argparse.Namespace:
         help="Sell sleeve name if predicted return is below this (default 0 = any negative)",
     )
     p.add_argument("--top-k", type=int, default=10, help="Max names to buy")
+    p.add_argument(
+        "--weight-mode",
+        choices=("score", "equal"),
+        default="score",
+        help="Buy sizing: score = conviction-weighted (default), equal = 1/n",
+    )
+    p.add_argument(
+        "--max-weight",
+        type=float,
+        default=0.30,
+        help="Cap per-name weight when --weight-mode=score (0 disables)",
+    )
     p.add_argument(
         "--notional",
         type=float,
@@ -184,7 +196,7 @@ def main() -> int:
         print("Refusing to run: ALPACA_PAPER is not true. Set ALPACA_PAPER=true.")
         return 1
 
-    symbols = UNIVERSE_50[: args.limit] if args.limit and args.limit > 0 else list(UNIVERSE_50)
+    symbols = UNIVERSE_100[: args.limit] if args.limit and args.limit > 0 else list(UNIVERSE_100)
     dry_run = not args.submit
     run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
 
@@ -367,56 +379,52 @@ def main() -> int:
 
     print(f"\nBuy budget: ${buy_budget:.2f} ({budget_label}, cash=${cash:.2f})")
 
-    # 2) Buy with remaining sleeve room only
+    # 2) Buy with remaining sleeve room only (score-weighted by default)
     candidates = [
         s
         for s in signals
         if s.expected_return >= args.min_return and s.symbol not in already
     ][: args.top_k]
 
-    buys: list[tuple] = []
-    remaining = buy_budget
-    if buy_budget > 0 and candidates:
-        for n in range(len(candidates), 0, -1):
-            slice_budget = buy_budget / n
-            trial = []
-            spent = 0.0
-            for s in candidates[:n]:
-                qty = math.floor(slice_budget / s.last_close)
-                if qty < 1:
-                    continue
-                cost = qty * s.last_close
-                if spent + cost > buy_budget + 1e-6:
-                    continue
-                trial.append((s, qty, cost))
-                spent += cost
-            if trial:
-                buys = trial
-                remaining = buy_budget - spent
-                break
+    buys, remaining = allocate_budget(
+        candidates,
+        buy_budget,
+        price_fn=lambda s: s.last_close,
+        score_fn=lambda s: conviction(s.score, s.expected_return),
+        mode=args.weight_mode,
+        max_weight=args.max_weight,
+    )
 
     print(
         f"Selected buys: {len(buys)} "
-        f"(min_return={args.min_return:.2%}, top_k={args.top_k}, leftover=${remaining:.2f})"
+        f"(mode={args.weight_mode}, max_w={args.max_weight:.0%}, "
+        f"min_return={args.min_return:.2%}, top_k={args.top_k}, leftover=${remaining:.2f})"
     )
 
     for s, qty, cost in buys:
+        w_mass = conviction(s.score, s.expected_return)
         result = submit_market_buy(trade, s.symbol, float(qty), dry_run=dry_run)
         orders.append(
             {
                 "side": "buy",
                 "symbol": s.symbol,
                 "expected_return": s.expected_return,
+                "score": s.score,
+                "conviction": w_mass,
                 "last_close": s.last_close,
                 "pred_close": s.pred_close,
                 "qty": qty,
                 "notional_est": round(cost, 2),
+                "weight_est": round(cost / buy_budget, 4) if buy_budget > 0 else None,
                 "submitted": result.submitted,
                 "order_id": result.order_id,
                 "message": result.message,
             }
         )
-        print(f"  BUY  {s.symbol}: qty={qty} ~${cost:.0f} [{result.message}]")
+        print(
+            f"  BUY  {s.symbol}: qty={qty} ~${cost:.0f} "
+            f"(conv={w_mass:+.3f}) [{result.message}]"
+        )
         if result.submitted:
             record_buy(
                 ledger,
@@ -447,6 +455,8 @@ def main() -> int:
             "min_return": args.min_return,
             "sell_below": args.sell_below,
             "top_k": args.top_k,
+            "weight_mode": args.weight_mode,
+            "max_weight": args.max_weight,
             "notional": args.notional,
             "model": args.model,
             "symbols": symbols,
@@ -455,6 +465,7 @@ def main() -> int:
             {
                 "symbol": s.symbol,
                 "expected_return": s.expected_return,
+                "score": s.score,
                 "last_close": s.last_close,
                 "pred_close": s.pred_close,
                 "bars": s.bars,
