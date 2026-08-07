@@ -249,8 +249,13 @@ def sleeve_example(
     currency: str,
     max_weight: float = 0.30,
     top_n: int = 10,
+    fractional: bool = False,
+    qty_decimals: int = 4,
 ) -> list[dict[str, Any]]:
-    """Score-weighted notional example (same logic as paper sizing)."""
+    """Score-weighted notional example (same logic as paper sizing).
+
+    ``fractional=True`` allows partial units (e.g. grams for commodities).
+    """
     rows = []
     for p in picks[:top_n]:
         exp = float(p.get("expected_return_pct", 0.0)) / 100.0
@@ -276,8 +281,22 @@ def sleeve_example(
         if w <= 0:
             continue
         notional = budget * w
-        qty = math.floor(notional / r["last_close"]) if r["last_close"] > 0 else 0
-        cost = qty * r["last_close"]
+        px = r["last_close"]
+        if px <= 0:
+            continue
+        if fractional:
+            # Floor to qty_decimals (e.g. 1.2384 → 1.23 with decimals=2).
+            scale = 10 ** int(qty_decimals)
+            raw = notional / px
+            qty = math.floor(raw * scale + 1e-12) / scale
+            if qty <= 0:
+                continue
+            cost = qty * px
+        else:
+            qty = math.floor(notional / px)
+            if qty < 1:
+                continue
+            cost = qty * px
         out.append(
             {
                 **r,
@@ -286,6 +305,7 @@ def sleeve_example(
                 "qty": qty,
                 "cost": round(cost, 2),
                 "currency": currency,
+                "fractional": fractional,
             }
         )
     return out
@@ -297,20 +317,30 @@ def format_sleeve_block(
     *,
     budget: float,
     currency: str,
+    qty_unit: str | None = None,
 ) -> list[str]:
     if not alloc:
         return []
     cur = "$" if currency == "USD" else "₺"
+    qty_hdr = f"Qty({qty_unit})" if qty_unit else "Qty"
     lines = [
         f"{title} — score-weighted sleeve example ({cur}{budget:,.0f})",
-        f"{'#':<3} {'Symbol':<10} {'Conv':>7} {'Wgt':>6} {'Qty':>6} {'Cost':>10}",
+        f"{'#':<3} {'Symbol':<10} {'Conv':>7} {'Wgt':>6} {qty_hdr:>10} {'Cost':>12}",
     ]
     spent = 0.0
     for i, a in enumerate(alloc, 1):
         spent += float(a["cost"])
+        cost_s = f"{cur} {a['cost']:,.0f}"
+        qty = a["qty"]
+        if isinstance(qty, float) or a.get("fractional"):
+            qty_s = f"{float(qty):.2f}"
+            if qty_unit:
+                qty_s = f"{qty_s} {qty_unit}"
+        else:
+            qty_s = str(int(qty))
         lines.append(
             f"{i:<3} {a['symbol']:<10} {a['conviction']:+7.3f} "
-            f"{a['weight']*100:5.1f}% {a['qty']:>6} {cur}{a['cost']:>9,.0f}"
+            f"{a['weight']*100:5.1f}% {qty_s:>10}  {cost_s:>12}"
         )
     lines.append(f"Deployed ~{cur}{spent:,.0f} / {cur}{budget:,.0f}  (max_weight=30%)")
     lines.append("")

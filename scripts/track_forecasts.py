@@ -343,9 +343,21 @@ def write_forecast_report_txt(
         if not scored:
             # Long-only sleeve on positive expected metals
             pos = [p for p in cmd["picks"] if float(p.get("expected_return_pct", 0)) > 0]
-            alloc = sleeve_example(pos or cmd["picks"], budget=10_000.0, currency="TRY")
+            alloc = sleeve_example(
+                pos or cmd["picks"],
+                budget=10_000.0,
+                currency="TRY",
+                fractional=True,
+                qty_decimals=2,
+            )
             lines.extend(
-                format_sleeve_block("  Sleeve COMMODITIES", alloc, budget=10_000.0, currency="TRY")
+                format_sleeve_block(
+                    "  Sleeve COMMODITIES",
+                    alloc,
+                    budget=10_000.0,
+                    currency="TRY",
+                    qty_unit="g",
+                )
             )
         lines.append("")
 
