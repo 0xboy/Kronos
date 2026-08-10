@@ -95,7 +95,12 @@ def run_once(limit: int, submit: bool, notional: float) -> int:
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Daily Alpaca paper rebalance loop (no day limit)")
     p.add_argument("--limit", type=int, default=0, help="Symbol count (0 = full SPUS100)")
-    p.add_argument("--notional", type=float, default=20000.0)
+    p.add_argument(
+        "--notional",
+        type=float,
+        default=0.0,
+        help="Pass-through to paper runner (0 = full account cash)",
+    )
     p.add_argument("--submit", action="store_true", help="Submit paper orders")
     p.add_argument(
         "--hour",
@@ -129,7 +134,7 @@ def install_windows_task() -> None:
     bat.write_text(
         "@echo off\r\n"
         f'cd /d "{ROOT}"\r\n'
-        f'"{PYTHON}" "{ROOT / "scripts" / "run_alpaca_loop.py"}" --once --limit 0 --notional 20000 --submit >> '
+        f'"{PYTHON}" "{ROOT / "scripts" / "run_alpaca_loop.py"}" --once --limit 0 --notional 0 --submit >> '
         f'"{ops / "task.log"}" 2>&1\r\n',
         encoding="utf-8",
     )

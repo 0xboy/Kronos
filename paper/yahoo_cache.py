@@ -113,6 +113,7 @@ def _to_kronos_frame(sdf: pd.DataFrame) -> pd.DataFrame | None:
 
 
 def download_yahoo(symbols: list[str], period: str = "2y") -> dict[str, pd.DataFrame]:
+    """Download daily bars. auto_adjust=True → split+dividend adjusted closes."""
     out: dict[str, pd.DataFrame] = {}
     chunk = 40
     for i in range(0, len(symbols), chunk):
@@ -140,6 +141,64 @@ def download_yahoo(symbols: list[str], period: str = "2y") -> dict[str, pd.DataF
             if frame is not None:
                 out[sym] = frame
     return out
+
+
+def purge_universe_cache(universe: str) -> int:
+    """Delete CSV caches for a universe (manifest kept until next write)."""
+    d = cache_dir(universe)
+    n = 0
+    for path in d.glob("*.csv"):
+        path.unlink(missing_ok=True)
+        n += 1
+    manifest = d / "manifest.json"
+    if manifest.exists():
+        manifest.unlink(missing_ok=True)
+    return n
+
+
+def scan_cache_discontinuities(
+    universe: str,
+    symbols: list[str] | None = None,
+    *,
+    max_abs_ret: float = 0.40,
+) -> list[dict]:
+    """Find cached series with split-like cliffs (should be empty if auto_adjust worked)."""
+    d = cache_dir(universe)
+    files = sorted(d.glob("*.csv"))
+    if symbols is None:
+        symbols = [p.stem.replace("_", ".") if p.stem.endswith("_IS") else p.stem for p in files]
+        # Prefer actual symbol from filename via reverse of _safe_name is lossy; scan files directly.
+        bad = []
+        for path in files:
+            df = pd.read_csv(path)
+            if "close" not in df.columns or len(df) < 2:
+                continue
+            rets = pd.to_numeric(df["close"], errors="coerce").pct_change().dropna()
+            if rets.empty:
+                continue
+            jump = float(rets.abs().max())
+            if jump > max_abs_ret:
+                bad.append(
+                    {
+                        "symbol": path.stem,
+                        "max_abs_ret": round(jump, 4),
+                        "path": str(path),
+                    }
+                )
+        return bad
+
+    bad = []
+    for sym in symbols:
+        df = load_symbol(universe, sym)
+        if df is None or len(df) < 2:
+            continue
+        rets = pd.to_numeric(df["close"], errors="coerce").pct_change().dropna()
+        if rets.empty:
+            continue
+        jump = float(rets.abs().max())
+        if jump > max_abs_ret:
+            bad.append({"symbol": sym, "max_abs_ret": round(jump, 4), "path": str(csv_path(universe, sym))})
+    return bad
 
 
 def get_yahoo_bars(

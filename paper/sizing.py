@@ -126,3 +126,56 @@ def allocate_budget(
         return trial, float(budget - spent)
 
     return [], float(budget)
+
+
+def plan_rebalance(
+    items: Sequence[T],
+    budget: float,
+    *,
+    price_fn: Callable[[T], float],
+    score_fn: Callable[[T], float],
+    current_qty_fn: Callable[[T], float],
+    mode: str = "score",
+    max_weight: float = 0.30,
+    min_trade_value: float = 25.0,
+) -> tuple[list[tuple[T, str, int, float, float, float]], float]:
+    """Score-weight ``budget`` across ``items`` and emit buy/sell deltas vs current qty.
+
+    Returns
+    -------
+    trades : list of (item, side, qty, notional, target_value, current_value)
+    leftover : dollars not assigned after target qty flooring
+    """
+    targets, leftover = allocate_budget(
+        items,
+        budget,
+        price_fn=price_fn,
+        score_fn=score_fn,
+        mode=mode,
+        max_weight=max_weight,
+    )
+    target_qty = {id(t[0]): t[1] for t in targets}
+    target_val = {id(t[0]): t[2] for t in targets}
+
+    trades: list[tuple[T, str, int, float, float, float]] = []
+    for x in items:
+        px = float(price_fn(x))
+        if px <= 0:
+            continue
+        cur_q = max(0, int(math.floor(float(current_qty_fn(x)))))
+        tgt_q = int(target_qty.get(id(x), 0))
+        cur_v = cur_q * px
+        tgt_v = float(target_val.get(id(x), tgt_q * px))
+        delta = tgt_q - cur_q
+        if delta == 0:
+            continue
+        notional = abs(delta) * px
+        if notional < float(min_trade_value) and abs(delta) < 2:
+            # Skip tiny churn (keep at least meaningful 2-share moves).
+            continue
+        side = "buy" if delta > 0 else "sell"
+        trades.append((x, side, abs(delta), notional, tgt_v, cur_v))
+
+    # Sells first so buying power frees up before buys.
+    trades.sort(key=lambda t: (0 if t[1] == "sell" else 1, -t[3]))
+    return trades, leftover

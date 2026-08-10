@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from alpaca.common.exceptions import APIError
 from alpaca.trading.client import TradingClient
 from alpaca.trading.enums import OrderSide, TimeInForce
 from alpaca.trading.requests import MarketOrderRequest
@@ -69,14 +70,18 @@ def submit_market_sell(
     if dry_run:
         return OrderResult(symbol, qty, "sell", False, None, "dry_run (no order sent)")
 
-    order = client.submit_order(
-        MarketOrderRequest(
-            symbol=symbol,
-            qty=qty,
-            side=OrderSide.SELL,
-            time_in_force=TimeInForce.DAY,
+    try:
+        order = client.submit_order(
+            MarketOrderRequest(
+                symbol=symbol,
+                qty=qty,
+                side=OrderSide.SELL,
+                time_in_force=TimeInForce.DAY,
+            )
         )
-    )
+    except APIError as exc:
+        return OrderResult(symbol, qty, "sell", False, None, f"rejected: {exc}")
+
     return OrderResult(
         symbol=symbol,
         qty=qty,
@@ -106,14 +111,18 @@ def submit_market_buy(
     if dry_run:
         return OrderResult(symbol, qty, "buy", False, None, "dry_run (no order sent)")
 
-    order = client.submit_order(
-        MarketOrderRequest(
-            symbol=symbol,
-            qty=qty,
-            side=OrderSide.BUY,
-            time_in_force=TimeInForce.DAY,
+    try:
+        order = client.submit_order(
+            MarketOrderRequest(
+                symbol=symbol,
+                qty=qty,
+                side=OrderSide.BUY,
+                time_in_force=TimeInForce.DAY,
+            )
         )
-    )
+    except APIError as exc:
+        return OrderResult(symbol, qty, "buy", False, None, f"rejected: {exc}")
+
     return OrderResult(
         symbol=symbol,
         qty=qty,

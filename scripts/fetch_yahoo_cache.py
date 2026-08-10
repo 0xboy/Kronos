@@ -14,6 +14,9 @@
 
   # force re-download
   .venv/Scripts/python.exe scripts/fetch_yahoo_cache.py --refresh
+
+  # wipe CSVs then re-download (after splits etc.)
+  .venv/Scripts/python.exe scripts/fetch_yahoo_cache.py --universe spus --purge
 """
 from __future__ import annotations
 
@@ -28,7 +31,13 @@ sys.path.insert(0, str(ROOT))
 from paper.commodities import COMMODITY_LABELS, get_commodity_try_gram_bars
 from paper.crypto import CRYPTO_LABELS
 from paper.universe import SPUS100, XK100
-from paper.yahoo_cache import CACHE_ROOT, check_cache, get_yahoo_bars
+from paper.yahoo_cache import (
+    CACHE_ROOT,
+    check_cache,
+    get_yahoo_bars,
+    purge_universe_cache,
+    scan_cache_discontinuities,
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -40,6 +49,11 @@ def parse_args() -> argparse.Namespace:
     )
     p.add_argument("--check", action="store_true", help="Only report cache status")
     p.add_argument("--refresh", action="store_true", help="Force re-download")
+    p.add_argument(
+        "--purge",
+        action="store_true",
+        help="Delete universe CSV cache before download (implies refresh)",
+    )
     p.add_argument("--max-age-days", type=int, default=1)
     p.add_argument("--period", default="2y")
     return p.parse_args()
@@ -70,6 +84,10 @@ def run_one(universe: str, args: argparse.Namespace) -> dict:
         return report
 
     print(f"=== {universe} | {len(syms)} symbols ===")
+    if args.purge and universe not in ("commodities",):
+        n = purge_universe_cache(universe)
+        print(f"Purged {n} cached CSV files under {universe}")
+        args.refresh = True
     if universe == "commodities":
         bars = get_commodity_try_gram_bars(
             period=args.period,
@@ -90,6 +108,14 @@ def run_one(universe: str, args: argparse.Namespace) -> dict:
         f"ok>={report['ok_ge_400_bars']} thin={report['thin']} "
         f"missing={report['missing_or_empty']}"
     )
+    if universe in ("spus", "xk100"):
+        cliffs = scan_cache_discontinuities(universe, syms, max_abs_ret=0.40)
+        if cliffs:
+            print(f"WARNING: {len(cliffs)} series still have |daily ret|>40%:")
+            for row in cliffs[:10]:
+                print(f"  {row['symbol']} max|r|={row['max_abs_ret']:.0%}")
+        else:
+            print("Split-scan OK: no |daily ret|>40% cliffs")
     return report
 
 

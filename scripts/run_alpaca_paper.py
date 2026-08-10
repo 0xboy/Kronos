@@ -8,14 +8,16 @@ Usage:
   4) Quick 5-symbol test: .venv/Scripts/python.exe scripts/run_alpaca_paper.py --limit 5
 
 Portfolio sleeve:
-  --notional 20000  → only trade within this $ budget; buys use leftover after kept holds
-  --notional 0      → deploy all account cash
+  --notional 0      → deploy all account cash/equity into score-weighted rebalance (default)
+  --notional N      → cap sleeve at $N; rebalance within that book
+  --no-rebalance    → old behavior: only sell negatives + buy new names with leftover cash
   Only positions recorded in paper_results/sleeve_ledger.json are managed.
 """
 from __future__ import annotations
 
 import argparse
 import json
+import math
 import sys
 import time
 from datetime import datetime, timezone
@@ -34,7 +36,11 @@ from paper.broker import (
     submit_market_sell,
 )
 from paper.config import load_settings
-from paper.data import fetch_daily_bars, make_data_client
+from paper.data import (
+    drop_split_discontinuities,
+    fetch_daily_bars,
+    make_data_client,
+)
 from paper.ledger import (
     DEFAULT_PATH as LEDGER_DEFAULT,
     drop_holding,
@@ -46,7 +52,7 @@ from paper.ledger import (
     save_ledger,
 )
 from paper.signals import load_predictor, score_symbol
-from paper.sizing import allocate_budget, conviction
+from paper.sizing import allocate_budget, conviction, plan_rebalance
 from paper.universe import UNIVERSE_100
 
 
@@ -101,7 +107,12 @@ def parse_args() -> argparse.Namespace:
         default=0.0,
         help="Sell sleeve name if predicted return is below this (default 0 = any negative)",
     )
-    p.add_argument("--top-k", type=int, default=10, help="Max names to buy")
+    p.add_argument(
+        "--top-k",
+        type=int,
+        default=10,
+        help="Max sleeve names total (holds + new buys); buys fill remaining slots only",
+    )
     p.add_argument(
         "--weight-mode",
         choices=("score", "equal"),
@@ -117,8 +128,20 @@ def parse_args() -> argparse.Namespace:
     p.add_argument(
         "--notional",
         type=float,
-        default=20000.0,
-        help="Sleeve $ budget: buys use remaining after kept holds. 0 = use all cash",
+        default=0.0,
+        help="Sleeve $ budget (0 = full account; >0 = cap after kept holds)",
+    )
+    p.add_argument(
+        "--rebalance",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Score-weight full sleeve (trim/add holds). --no-rebalance = cash-only adds",
+    )
+    p.add_argument(
+        "--min-trade",
+        type=float,
+        default=25.0,
+        help="Skip rebalance legs smaller than this $ notional",
     )
     p.add_argument("--submit", action="store_true", help="Actually submit paper market orders")
     p.add_argument(
@@ -201,8 +224,7 @@ def main() -> int:
     run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
 
     ledger = load_ledger(args.ledger)
-    if args.notional > 0:
-        ledger["budget"] = float(args.notional)
+    # budget field is bookkeeping only; buy sizing uses --notional / cash below
 
     print(f"Universe: {len(symbols)} symbols")
     print(f"Mode: {'DRY-RUN' if dry_run else 'SUBMIT PAPER ORDERS'}")
@@ -219,19 +241,29 @@ def main() -> int:
     snap = account_snapshot(trade)
     print(f"Account: equity=${snap['equity']:.2f} cash=${snap['cash']:.2f} bp=${snap['buying_power']:.2f}")
 
-    print("Fetching daily bars from Alpaca...")
+    print("Fetching daily bars from Alpaca (split+div adjusted)...")
     bars = fetch_daily_bars(data, symbols, lookback_trading_days=max(args.lookback + 50, 450))
+    bars, split_drops = drop_split_discontinuities(bars, max_abs_ret=0.40)
     print(f"Got bars for {len(bars)}/{len(symbols)} symbols")
+    skipped: list[tuple[str, str]] = []
+    if split_drops:
+        print(
+            "Dropped split/jump artifacts: "
+            + ", ".join(f"{s}(|r|={j:.0%})" for s, j in split_drops[:20])
+            + ("..." if len(split_drops) > 20 else "")
+        )
+        for s, j in split_drops:
+            skipped.append((s, f"price_discontinuity_|r|={j:.2%}"))
 
     print("Loading Kronos...")
     predictor = load_predictor(args.model)
 
     signals = []
-    skipped = []
     for i, symbol in enumerate(symbols, 1):
         df = bars.get(symbol)
         if df is None:
-            skipped.append((symbol, "no bars"))
+            if not any(sym == symbol for sym, _ in skipped):
+                skipped.append((symbol, "no bars"))
             continue
         print(f"[{i}/{len(symbols)}] scoring {symbol} ({len(df)} bars)...")
         try:
@@ -365,45 +397,68 @@ def main() -> int:
         kept_value = sleeve_kept_value(already, qty_by_sym, alpaca_by_sym, signal_price)
 
     cash = float(snap["cash"])
+    buying_power = float(snap.get("buying_power") or cash)
     if dry_run and sells:
-        cash += sum(float(o["notional_est"]) for o in orders if o["side"] == "sell")
+        sold_notional = sum(float(o["notional_est"]) for o in orders if o["side"] == "sell")
+        cash += sold_notional
+        buying_power += sold_notional
 
-    budget = float(args.notional)
-    if budget > 0:
-        room = max(0.0, budget - kept_value)
-        buy_budget = min(cash, room)
-        budget_label = f"sleeve=${budget:.0f} kept=${kept_value:.0f} room=${room:.0f}"
+    # Alpaca rejects if cost > buying_power; cash can look higher than BP briefly.
+    deployable = min(cash, buying_power)
+    deployable = max(0.0, deployable * 0.995)
+
+    budget_cap = float(args.notional)
+    if budget_cap > 0:
+        sleeve_budget = budget_cap
+        budget_label = f"sleeve_cap=${budget_cap:.0f} kept=${kept_value:.0f} cash=${cash:.0f}"
+        ledger["budget"] = budget_cap
     else:
-        buy_budget = max(0.0, cash)
-        budget_label = f"full-cash=${cash:.0f}"
+        sleeve_budget = kept_value + deployable
+        budget_label = (
+            f"full-rebalance nav=${sleeve_budget:.0f} "
+            f"kept=${kept_value:.0f} cash=${cash:.0f} bp=${buying_power:.0f}"
+        )
+        ledger["budget"] = float(snap.get("equity") or sleeve_budget)
 
-    print(f"\nBuy budget: ${buy_budget:.2f} ({budget_label}, cash=${cash:.2f})")
+    print(f"\nSleeve budget: ${sleeve_budget:.2f} ({budget_label})")
 
-    # 2) Buy with remaining sleeve room only (score-weighted by default)
-    candidates = [
-        s
-        for s in signals
-        if s.expected_return >= args.min_return and s.symbol not in already
-    ][: args.top_k]
+    by_sym = {s.symbol: s for s in signals}
 
-    buys, remaining = allocate_budget(
-        candidates,
-        buy_budget,
-        price_fn=lambda s: s.last_close,
-        score_fn=lambda s: conviction(s.score, s.expected_return),
-        mode=args.weight_mode,
-        max_weight=args.max_weight,
-    )
-
-    print(
-        f"Selected buys: {len(buys)} "
-        f"(mode={args.weight_mode}, max_w={args.max_weight:.0%}, "
-        f"min_return={args.min_return:.2%}, top_k={args.top_k}, leftover=${remaining:.2f})"
-    )
-
-    for s, qty, cost in buys:
+    def _submit_buy(s, qty: int, cost: float, *, tag: str = "buy") -> None:
+        nonlocal already
         w_mass = conviction(s.score, s.expected_return)
-        result = submit_market_buy(trade, s.symbol, float(qty), dry_run=dry_run)
+        q = int(qty)
+        c = float(cost)
+        if not dry_run and s.last_close > 0:
+            live = account_snapshot(trade)
+            bp = max(0.0, float(live["buying_power"]) * 0.995)
+            max_qty = math.floor(bp / float(s.last_close))
+            if max_qty < q:
+                print(f"  trim {s.symbol}: qty {q} -> {max_qty} (bp=${bp:.0f})")
+                q = max_qty
+                c = float(q) * float(s.last_close)
+            if q < 1:
+                orders.append(
+                    {
+                        "side": "buy",
+                        "symbol": s.symbol,
+                        "expected_return": s.expected_return,
+                        "score": s.score,
+                        "conviction": w_mass,
+                        "last_close": s.last_close,
+                        "pred_close": s.pred_close,
+                        "qty": 0,
+                        "notional_est": 0.0,
+                        "weight_est": None,
+                        "submitted": False,
+                        "order_id": None,
+                        "message": "skipped: insufficient buying power",
+                        "tag": tag,
+                    }
+                )
+                print(f"  BUY  {s.symbol}: skip (insufficient buying power)")
+                return
+        result = submit_market_buy(trade, s.symbol, float(q), dry_run=dry_run)
         orders.append(
             {
                 "side": "buy",
@@ -413,29 +468,181 @@ def main() -> int:
                 "conviction": w_mass,
                 "last_close": s.last_close,
                 "pred_close": s.pred_close,
-                "qty": qty,
-                "notional_est": round(cost, 2),
-                "weight_est": round(cost / buy_budget, 4) if buy_budget > 0 else None,
+                "qty": q,
+                "notional_est": round(c, 2),
+                "weight_est": round(c / sleeve_budget, 4) if sleeve_budget > 0 else None,
                 "submitted": result.submitted,
                 "order_id": result.order_id,
                 "message": result.message,
+                "tag": tag,
             }
         )
-        print(
-            f"  BUY  {s.symbol}: qty={qty} ~${cost:.0f} "
-            f"(conv={w_mass:+.3f}) [{result.message}]"
+        print(f"  BUY  {s.symbol}: qty={q} ~${c:.0f} (conv={w_mass:+.3f}) [{result.message}]")
+        if result.submitted or (dry_run and q > 0):
+            if result.submitted:
+                record_buy(
+                    ledger,
+                    symbol=s.symbol,
+                    qty=float(q),
+                    price=float(s.last_close),
+                    order_id=result.order_id,
+                    expected_return=s.expected_return,
+                    run_id=run_id,
+                )
+            already.add(s.symbol)
+            if result.submitted and not dry_run:
+                time.sleep(0.5)
+
+    def _submit_sell(s, qty: float, *, tag: str = "sell") -> None:
+        nonlocal already
+        q = float(qty)
+        if q <= 0:
+            return
+        result = submit_market_sell(trade, s.symbol, q, dry_run=dry_run)
+        notional_est = round(q * s.last_close, 2)
+        orders.append(
+            {
+                "side": "sell",
+                "symbol": s.symbol,
+                "expected_return": s.expected_return,
+                "last_close": s.last_close,
+                "pred_close": s.pred_close,
+                "qty": q,
+                "notional_est": notional_est,
+                "submitted": result.submitted,
+                "order_id": result.order_id,
+                "message": result.message,
+                "tag": tag,
+            }
         )
+        print(f"  SELL {s.symbol}: qty={q} ~${notional_est:.0f} [{result.message}]")
         if result.submitted:
-            record_buy(
+            record_sell(
                 ledger,
                 symbol=s.symbol,
-                qty=float(qty),
+                qty=q,
                 price=float(s.last_close),
                 order_id=result.order_id,
                 expected_return=s.expected_return,
                 run_id=run_id,
             )
-            already.add(s.symbol)
+            already.discard(s.symbol)
+            time.sleep(0.5)
+        elif dry_run:
+            already.discard(s.symbol)
+
+    if args.rebalance:
+        # Target = top_k by conviction among names still above min_return.
+        ranked = sorted(
+            [s for s in signals if s.expected_return >= args.min_return],
+            key=lambda s: conviction(s.score, s.expected_return),
+            reverse=True,
+        )
+        target = ranked[: args.top_k]
+        target_syms = {s.symbol for s in target}
+
+        # Rotate out holds that fell out of top_k (still non-negative but weaker).
+        exits = [
+            by_sym[sym]
+            for sym in sorted(already)
+            if sym not in target_syms and sym in by_sym
+        ]
+        print(
+            f"\nRebalance target ({len(target)}): "
+            + ", ".join(s.symbol for s in target)
+        )
+        print(f"Rotate exits: {len(exits)} {[s.symbol for s in exits]}")
+        for s in exits:
+            ledger_q = holding_qty(ledger, s.symbol)
+            broker_q = position_qty(trade, s.symbol) if not dry_run else ledger_q
+            qty = min(ledger_q, broker_q) if broker_q > 0 else ledger_q
+            _submit_sell(s, qty, tag="rotate_out")
+
+        if not dry_run and exits:
+            time.sleep(1.5)
+            snap = account_snapshot(trade)
+            try:
+                alpaca_positions = list_positions(trade)
+                alpaca_by_sym = {p["symbol"]: p for p in alpaca_positions}
+            except Exception:  # noqa: BLE001
+                pass
+            cash = float(snap["cash"])
+            buying_power = float(snap.get("buying_power") or cash)
+            deployable = max(0.0, min(cash, buying_power) * 0.995)
+            qty_by_sym = {sym: holding_qty(ledger, sym) for sym in already}
+            kept_value = sleeve_kept_value(already, qty_by_sym, alpaca_by_sym, signal_price)
+            if budget_cap > 0:
+                sleeve_budget = budget_cap
+            else:
+                sleeve_budget = kept_value + deployable
+            print(f"Post-exit sleeve budget: ${sleeve_budget:.2f} (kept=${kept_value:.0f})")
+        elif dry_run and exits:
+            exit_val = sum(
+                holding_qty(ledger, s.symbol) * s.last_close for s in exits
+            )
+            kept_value = max(0.0, kept_value - exit_val)
+            deployable = deployable + exit_val
+            if budget_cap > 0:
+                sleeve_budget = budget_cap
+            else:
+                sleeve_budget = kept_value + deployable
+
+        def _cur_qty(s) -> float:
+            if dry_run:
+                return float(holding_qty(ledger, s.symbol)) if s.symbol in already else 0.0
+            return float(position_qty(trade, s.symbol))
+
+        trades, leftover = plan_rebalance(
+            target,
+            sleeve_budget,
+            price_fn=lambda s: s.last_close,
+            score_fn=lambda s: conviction(s.score, s.expected_return),
+            current_qty_fn=_cur_qty,
+            mode=args.weight_mode,
+            max_weight=args.max_weight,
+            min_trade_value=args.min_trade,
+        )
+        print(
+            f"Rebalance legs: {len(trades)} "
+            f"(mode={args.weight_mode}, max_w={args.max_weight:.0%}, "
+            f"min_trade=${args.min_trade:.0f}, leftover=${leftover:.2f})"
+        )
+        for s, side, qty, notional, tgt_v, cur_v in trades:
+            print(
+                f"  plan {side.upper():4} {s.symbol}: qty={qty} "
+                f"~${notional:.0f}  cur=${cur_v:.0f} -> tgt=${tgt_v:.0f}"
+            )
+            if side == "sell":
+                _submit_sell(s, float(qty), tag="rebalance_trim")
+            else:
+                _submit_buy(s, int(qty), float(notional), tag="rebalance_add")
+    else:
+        # Legacy: only deploy leftover cash into new names; holds untouched.
+        buy_budget = deployable
+        if budget_cap > 0:
+            room = max(0.0, budget_cap - kept_value)
+            buy_budget = min(deployable, room)
+        print(f"Buy budget (no-rebalance): ${buy_budget:.2f}")
+        buy_slots = max(0, int(args.top_k) - len(already))
+        candidates = [
+            s
+            for s in signals
+            if s.expected_return >= args.min_return and s.symbol not in already
+        ][:buy_slots]
+        buys, remaining = allocate_budget(
+            candidates,
+            buy_budget,
+            price_fn=lambda s: s.last_close,
+            score_fn=lambda s: conviction(s.score, s.expected_return),
+            mode=args.weight_mode,
+            max_weight=args.max_weight,
+        )
+        print(
+            f"Selected buys: {len(buys)} "
+            f"(held={len(already)}, buy_slots={buy_slots}, leftover=${remaining:.2f})"
+        )
+        for s, qty, cost in buys:
+            _submit_buy(s, int(qty), float(cost), tag="cash_add")
 
     out = {
         "ts": datetime.now(timezone.utc).isoformat(),
@@ -443,9 +650,9 @@ def main() -> int:
         "run_id": run_id,
         "account": snap,
         "sleeve": {
-            "budget": budget,
+            "budget": sleeve_budget,
             "kept_value": round(kept_value, 2),
-            "buy_budget": round(buy_budget, 2),
+            "deployable": round(deployable, 2),
             "holdings": sorted(holding_symbols(ledger)) if not dry_run else sorted(already),
             "ledger_path": str(args.ledger),
         },
@@ -458,6 +665,8 @@ def main() -> int:
             "weight_mode": args.weight_mode,
             "max_weight": args.max_weight,
             "notional": args.notional,
+            "rebalance": bool(args.rebalance),
+            "min_trade": args.min_trade,
             "model": args.model,
             "symbols": symbols,
         },

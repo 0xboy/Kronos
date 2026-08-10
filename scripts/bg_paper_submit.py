@@ -32,11 +32,11 @@ def main() -> int:
     log("BG submit armed — waiting for US market open")
     while not market_is_open(client):
         time.sleep(15)
-    log("Market open — running paper submit ($20k)")
+    log("Market open — running paper submit (full cash)")
     py = ROOT / ".venv" / "Scripts" / "python.exe"
     job = ROOT / "scripts" / "run_alpaca_paper.py"
     rc = subprocess.run(
-        [str(py), str(job), "--notional", "20000", "--submit"],
+        [str(py), str(job), "--notional", "0", "--submit"],
         cwd=str(ROOT),
     ).returncode
     log(f"Done exit={rc}")

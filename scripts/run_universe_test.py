@@ -26,6 +26,7 @@ from paper.signals import load_predictor, score_symbol
 from paper.universe import COMMODITIES, CRYPTO, SPUS100, XK100
 from paper.xk100_rank import DEFAULT_CFG, cfg_to_dict, rank_signals
 from paper.yahoo_cache import get_yahoo_bars
+from paper.data import drop_split_discontinuities
 
 
 def parse_args() -> argparse.Namespace:
@@ -121,6 +122,12 @@ def main() -> int:
         for ysym, df in raw.items():
             key = ysym.replace(".IS", "") if args.universe == "xk100" else ysym
             bars[key] = df
+        bars, split_drops = drop_split_discontinuities(bars, max_abs_ret=0.40)
+        if split_drops:
+            print(
+                "Dropped split/jump artifacts: "
+                + ", ".join(f"{s}(|r|={j:.0%})" for s, j in split_drops[:15])
+            )
 
     print(f"Got bars for {len(bars)}/{len(labels)}")
     print("Loading Kronos...")

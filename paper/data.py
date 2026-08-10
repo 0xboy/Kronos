@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Iterable
 
 import pandas as pd
-from alpaca.data.enums import DataFeed
+from alpaca.data.enums import Adjustment, DataFeed
 from alpaca.data.historical import StockHistoricalDataClient
 from alpaca.data.requests import StockBarsRequest
 from alpaca.data.timeframe import TimeFrame
@@ -19,8 +19,14 @@ def fetch_daily_bars(
     symbols: Iterable[str],
     lookback_trading_days: int = 450,
     feed: DataFeed = DataFeed.IEX,
+    *,
+    adjustment: Adjustment = Adjustment.ALL,
 ) -> dict[str, pd.DataFrame]:
-    """Fetch daily OHLCV for many symbols. Returns {symbol: DataFrame}."""
+    """Fetch daily OHLCV for many symbols. Returns {symbol: DataFrame}.
+
+    Uses split+dividend adjusted bars by default so Kronos does not see
+    raw post-split cliffs (e.g. BKNG ~4200 → ~176).
+    """
     symbols = list(symbols)
     # Calendar buffer so we still get enough trading sessions
     start = datetime.now(timezone.utc) - timedelta(days=int(lookback_trading_days * 1.7))
@@ -32,6 +38,7 @@ def fetch_daily_bars(
         start=start,
         end=end,
         feed=feed,
+        adjustment=adjustment,
     )
     barset = client.get_stock_bars(req)
     raw = barset.df
@@ -50,6 +57,33 @@ def fetch_daily_bars(
         symbol = symbols[0]
         out[symbol] = _normalize_ohlcv(raw.copy())
     return out
+
+
+def max_abs_daily_return(df: pd.DataFrame) -> float:
+    """Largest |close-to-close| move; huge values usually mean unadjusted splits."""
+    if df is None or len(df) < 2 or "close" not in df.columns:
+        return 0.0
+    rets = pd.to_numeric(df["close"], errors="coerce").pct_change().dropna()
+    if rets.empty:
+        return 0.0
+    return float(rets.abs().max())
+
+
+def drop_split_discontinuities(
+    bars: dict[str, pd.DataFrame],
+    *,
+    max_abs_ret: float = 0.40,
+) -> tuple[dict[str, pd.DataFrame], list[tuple[str, float]]]:
+    """Remove series with implausible overnight jumps (likely raw split artifacts)."""
+    kept: dict[str, pd.DataFrame] = {}
+    dropped: list[tuple[str, float]] = []
+    for sym, df in bars.items():
+        jump = max_abs_daily_return(df)
+        if jump > max_abs_ret:
+            dropped.append((sym, jump))
+            continue
+        kept[sym] = df
+    return kept, dropped
 
 
 def _normalize_ohlcv(df: pd.DataFrame) -> pd.DataFrame:

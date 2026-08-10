@@ -18,9 +18,9 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def empty_ledger(budget: float = 20000.0) -> dict[str, Any]:
+def empty_ledger(budget: float = 0.0) -> dict[str, Any]:
     return {
-        "budget": float(budget),
+        "budget": float(budget),  # 0 = full-cash mode; runner may overwrite with equity
         "updated_at": _now(),
         "holdings": {},  # symbol -> {qty, avg_cost, cost_basis, opened_at}
         "trades": [],
@@ -32,7 +32,7 @@ def load_ledger(path: Path | None = None) -> dict[str, Any]:
     if not path.exists():
         return empty_ledger()
     data = json.loads(path.read_text(encoding="utf-8"))
-    data.setdefault("budget", 20000.0)
+    data.setdefault("budget", 0.0)
     data.setdefault("holdings", {})
     data.setdefault("trades", [])
     data.setdefault("updated_at", _now())
