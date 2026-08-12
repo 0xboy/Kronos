@@ -22,7 +22,7 @@ sys.path.insert(0, str(ROOT))
 
 from paper.commodities import COMMODITY_META, get_commodity_try_gram_bars
 from paper.crypto import CRYPTO_META
-from paper.signals import load_predictor, score_symbol
+from paper.signals import device_summary, load_predictor, score_symbol
 from paper.universe import COMMODITIES, CRYPTO, SPUS100, XK100
 from paper.xk100_rank import DEFAULT_CFG, cfg_to_dict, rank_signals
 from paper.yahoo_cache import get_yahoo_bars
@@ -42,6 +42,11 @@ def parse_args() -> argparse.Namespace:
         help="Kronos sample paths (0 = 1 for most markets, DEFAULT_CFG for xk100)",
     )
     p.add_argument("--model", default="NeoQuasar/Kronos-small")
+    p.add_argument(
+        "--device",
+        default="auto",
+        help="Inference device: auto (CUDA if available), cuda, cuda:0, cpu",
+    )
     p.add_argument("--refresh", action="store_true", help="Force Yahoo re-download")
     p.add_argument("--max-age-days", type=int, default=1)
     return p.parse_args()
@@ -131,7 +136,13 @@ def main() -> int:
 
     print(f"Got bars for {len(bars)}/{len(labels)}")
     print("Loading Kronos...")
-    predictor = load_predictor(args.model)
+    hw = device_summary(args.device)
+    print(
+        f"Compute: device={hw['device']}"
+        + (f" gpu={hw['gpu']}" if hw.get("gpu") else "")
+        + f" torch={hw['torch']}"
+    )
+    predictor = load_predictor(args.model, device=args.device)
 
     use_xk100_rank = args.universe == "xk100"
     if args.sample_count and args.sample_count > 0:
@@ -227,6 +238,7 @@ def main() -> int:
             "pred_len": args.pred_len,
             "sample_count": sample_count,
             "model": args.model,
+            "device": hw,
             "symbols": labels,
             **({"xk100_rank": cfg_to_dict(xk_cfg)} if xk_cfg is not None else {}),
         },

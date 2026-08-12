@@ -75,7 +75,7 @@ def next_run_after(now: datetime, hour: int, minute: int) -> datetime:
     return candidate
 
 
-def run_once(limit: int, submit: bool, notional: float) -> int:
+def run_once(limit: int, submit: bool, notional: float, device: str = "auto") -> int:
     cmd = [
         str(PYTHON),
         str(JOB),
@@ -83,6 +83,8 @@ def run_once(limit: int, submit: bool, notional: float) -> int:
         str(limit),
         "--notional",
         str(notional),
+        "--device",
+        device,
     ]
     if submit:
         cmd.append("--submit")
@@ -102,6 +104,11 @@ def parse_args() -> argparse.Namespace:
         help="Pass-through to paper runner (0 = full account cash)",
     )
     p.add_argument("--submit", action="store_true", help="Submit paper orders")
+    p.add_argument(
+        "--device",
+        default="auto",
+        help="Pass-through inference device (auto/cuda/cpu)",
+    )
     p.add_argument(
         "--hour",
         type=int,
@@ -134,7 +141,7 @@ def install_windows_task() -> None:
     bat.write_text(
         "@echo off\r\n"
         f'cd /d "{ROOT}"\r\n'
-        f'"{PYTHON}" "{ROOT / "scripts" / "run_alpaca_loop.py"}" --once --limit 0 --notional 0 --submit >> '
+        f'"{PYTHON}" "{ROOT / "scripts" / "run_alpaca_loop.py"}" --once --limit 0 --notional 0 --device auto --submit >> '
         f'"{ops / "task.log"}" 2>&1\r\n',
         encoding="utf-8",
     )
@@ -175,7 +182,7 @@ def run_once_cron(args: argparse.Namespace) -> int:
         log(f"Already ran today ({today_s}) — skip")
         return 0
 
-    rc = run_once(args.limit, args.submit, args.notional)
+    rc = run_once(args.limit, args.submit, args.notional, args.device)
     if rc == 0:
         state["last_run"] = today_s
         save_state(state)
@@ -208,7 +215,7 @@ def main() -> int:
     if args.run_now:
         today = datetime.now(NY).date().isoformat()
         if state.get("last_run") != today:
-            rc = run_once(args.limit, args.submit, args.notional)
+            rc = run_once(args.limit, args.submit, args.notional, args.device)
             if rc == 0:
                 state["last_run"] = today
                 save_state(state)
@@ -234,7 +241,7 @@ def main() -> int:
         )
 
         if in_window:
-            rc = run_once(args.limit, args.submit, args.notional)
+            rc = run_once(args.limit, args.submit, args.notional, args.device)
             if rc == 0:
                 state["last_run"] = today
                 save_state(state)

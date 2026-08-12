@@ -1,5 +1,7 @@
 numpy
 pandas
+# Prefer CUDA build on NVIDIA machines (CPU wheel silently disables GPU):
+#   pip install torch --index-url https://download.pytorch.org/whl/cu128
 torch>=2.0.0
 
 einops==0.8.1

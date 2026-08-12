@@ -21,12 +21,55 @@ class Signal:
     score: float = 0.0
 
 
+def resolve_device(device: str | None = None) -> str:
+    """Pick inference device. Default: CUDA → MPS → CPU."""
+    if device is None or str(device).strip().lower() in ("", "auto"):
+        if torch.cuda.is_available():
+            return "cuda:0"
+        if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+            return "mps"
+        return "cpu"
+
+    d = str(device).strip().lower()
+    if d in ("cuda", "gpu"):
+        d = "cuda:0"
+    if d.startswith("cuda") and not torch.cuda.is_available():
+        raise RuntimeError(
+            "CUDA requested but torch.cuda.is_available() is False. "
+            "Install a CUDA build, e.g. "
+            "pip install torch --index-url https://download.pytorch.org/whl/cu128"
+        )
+    return d
+
+
+def device_summary(device: str | None = None) -> dict:
+    """Small dict for logs / run JSON (GPU name, torch build)."""
+    resolved = resolve_device(device)
+    info: dict = {
+        "device": resolved,
+        "torch": torch.__version__,
+        "cuda_available": bool(torch.cuda.is_available()),
+    }
+    if resolved.startswith("cuda") and torch.cuda.is_available():
+        idx = int(resolved.split(":")[1]) if ":" in resolved else 0
+        info["gpu"] = torch.cuda.get_device_name(idx)
+        info["vram_gb"] = round(torch.cuda.get_device_properties(idx).total_memory / (1024**3), 2)
+    return info
+
+
 def load_predictor(model_id: str = "NeoQuasar/Kronos-small", device: str | None = None) -> KronosPredictor:
-    if device is None:
-        device = "cuda" if torch.cuda.is_available() else "cpu"
+    resolved = resolve_device(device)
+    summary = device_summary(resolved)
+    label = summary.get("gpu") or resolved
+    print(f"Device: {resolved}" + (f" ({label})" if summary.get("gpu") else ""))
+    if resolved == "cpu" and "+cpu" in torch.__version__.lower():
+        print(
+            "Warning: CPU-only torch build detected. For GPU: "
+            "pip install --force-reinstall torch --index-url https://download.pytorch.org/whl/cu128"
+        )
     tokenizer = KronosTokenizer.from_pretrained("NeoQuasar/Kronos-Tokenizer-base")
     model = Kronos.from_pretrained(model_id)
-    return KronosPredictor(model, tokenizer, device=device, max_context=512)
+    return KronosPredictor(model, tokenizer, device=resolved, max_context=512)
 
 
 def _one_predict(

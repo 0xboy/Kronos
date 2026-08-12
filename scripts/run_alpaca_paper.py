@@ -51,7 +51,7 @@ from paper.ledger import (
     record_sell,
     save_ledger,
 )
-from paper.signals import load_predictor, score_symbol
+from paper.signals import device_summary, load_predictor, score_symbol
 from paper.sizing import allocate_budget, conviction, plan_rebalance
 from paper.universe import UNIVERSE_100
 
@@ -145,6 +145,11 @@ def parse_args() -> argparse.Namespace:
     )
     p.add_argument("--submit", action="store_true", help="Actually submit paper market orders")
     p.add_argument(
+        "--device",
+        default="auto",
+        help="Inference device: auto (CUDA if available), cuda, cuda:0, cpu",
+    )
+    p.add_argument(
         "--allow-closed",
         action="store_true",
         help="Allow --submit even when the US market is closed (default: refuse)",
@@ -230,6 +235,12 @@ def main() -> int:
     print(f"Mode: {'DRY-RUN' if dry_run else 'SUBMIT PAPER ORDERS'}")
     print(f"Model: {args.model} | lookback={args.lookback} pred_len={args.pred_len}")
     print(f"Ledger: {args.ledger}")
+    hw = device_summary(args.device)
+    print(
+        f"Compute: device={hw['device']}"
+        + (f" gpu={hw['gpu']} vram={hw['vram_gb']}GB" if hw.get("gpu") else "")
+        + f" torch={hw['torch']}"
+    )
 
     trade = make_trading_client(settings.api_key, settings.secret_key, paper=True)
     data = make_data_client(settings.api_key, settings.secret_key)
@@ -256,7 +267,7 @@ def main() -> int:
             skipped.append((s, f"price_discontinuity_|r|={j:.2%}"))
 
     print("Loading Kronos...")
-    predictor = load_predictor(args.model)
+    predictor = load_predictor(args.model, device=args.device)
 
     signals = []
     for i, symbol in enumerate(symbols, 1):
@@ -668,6 +679,7 @@ def main() -> int:
             "rebalance": bool(args.rebalance),
             "min_trade": args.min_trade,
             "model": args.model,
+            "device": hw,
             "symbols": symbols,
         },
         "signals": [
