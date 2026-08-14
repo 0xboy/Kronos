@@ -7,6 +7,7 @@ import pandas as pd
 import torch
 
 from model import Kronos, KronosPredictor, KronosTokenizer
+from paper.models import model_label, resolve_model_id
 
 
 @dataclass
@@ -57,18 +58,20 @@ def device_summary(device: str | None = None) -> dict:
     return info
 
 
-def load_predictor(model_id: str = "NeoQuasar/Kronos-small", device: str | None = None) -> KronosPredictor:
+def load_predictor(model_id: str = "spus-small-v1", device: str | None = None) -> KronosPredictor:
     resolved = resolve_device(device)
     summary = device_summary(resolved)
     label = summary.get("gpu") or resolved
+    checkpoint = resolve_model_id(model_id)
     print(f"Device: {resolved}" + (f" ({label})" if summary.get("gpu") else ""))
+    print(f"Predictor: {model_label(model_id)} <- {checkpoint}")
     if resolved == "cpu" and "+cpu" in torch.__version__.lower():
         print(
             "Warning: CPU-only torch build detected. For GPU: "
             "pip install --force-reinstall torch --index-url https://download.pytorch.org/whl/cu128"
         )
     tokenizer = KronosTokenizer.from_pretrained("NeoQuasar/Kronos-Tokenizer-base")
-    model = Kronos.from_pretrained(model_id)
+    model = Kronos.from_pretrained(checkpoint)
     return KronosPredictor(model, tokenizer, device=resolved, max_context=512)
 
 

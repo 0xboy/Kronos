@@ -75,7 +75,13 @@ def next_run_after(now: datetime, hour: int, minute: int) -> datetime:
     return candidate
 
 
-def run_once(limit: int, submit: bool, notional: float, device: str = "auto") -> int:
+def run_once(
+    limit: int,
+    submit: bool,
+    notional: float,
+    device: str = "auto",
+    model: str = "spus-small-v1",
+) -> int:
     cmd = [
         str(PYTHON),
         str(JOB),
@@ -85,6 +91,8 @@ def run_once(limit: int, submit: bool, notional: float, device: str = "auto") ->
         str(notional),
         "--device",
         device,
+        "--model",
+        model,
     ]
     if submit:
         cmd.append("--submit")
@@ -108,6 +116,11 @@ def parse_args() -> argparse.Namespace:
         "--device",
         default="auto",
         help="Pass-through inference device (auto/cuda/cpu)",
+    )
+    p.add_argument(
+        "--model",
+        default="spus-small-v1",
+        help="Pass-through model alias/path (default: spus-small-v1)",
     )
     p.add_argument(
         "--hour",
@@ -141,7 +154,8 @@ def install_windows_task() -> None:
     bat.write_text(
         "@echo off\r\n"
         f'cd /d "{ROOT}"\r\n'
-        f'"{PYTHON}" "{ROOT / "scripts" / "run_alpaca_loop.py"}" --once --limit 0 --notional 0 --device auto --submit >> '
+        f'"{PYTHON}" "{ROOT / "scripts" / "run_alpaca_loop.py"}" '
+        f"--once --limit 0 --notional 0 --device auto --model spus-small-v1 --submit >> "
         f'"{ops / "task.log"}" 2>&1\r\n',
         encoding="utf-8",
     )
@@ -182,7 +196,7 @@ def run_once_cron(args: argparse.Namespace) -> int:
         log(f"Already ran today ({today_s}) — skip")
         return 0
 
-    rc = run_once(args.limit, args.submit, args.notional, args.device)
+    rc = run_once(args.limit, args.submit, args.notional, args.device, args.model)
     if rc == 0:
         state["last_run"] = today_s
         save_state(state)
@@ -208,14 +222,15 @@ def main() -> int:
 
     log(
         f"Daily loop armed (no day limit) | limit={args.limit} | "
-        f"submit={args.submit} | daily @{args.hour:02d}:{args.minute:02d} ET"
+        f"submit={args.submit} | model={args.model} | "
+        f"daily @{args.hour:02d}:{args.minute:02d} ET"
     )
     log(f"Stop file: {STOP_PATH}")
 
     if args.run_now:
         today = datetime.now(NY).date().isoformat()
         if state.get("last_run") != today:
-            rc = run_once(args.limit, args.submit, args.notional, args.device)
+            rc = run_once(args.limit, args.submit, args.notional, args.device, args.model)
             if rc == 0:
                 state["last_run"] = today
                 save_state(state)
@@ -241,7 +256,7 @@ def main() -> int:
         )
 
         if in_window:
-            rc = run_once(args.limit, args.submit, args.notional, args.device)
+            rc = run_once(args.limit, args.submit, args.notional, args.device, args.model)
             if rc == 0:
                 state["last_run"] = today
                 save_state(state)

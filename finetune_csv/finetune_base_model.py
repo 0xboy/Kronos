@@ -200,6 +200,7 @@ def _build_dataset(config, data_type: str):
             predict_window=config.predict_window,
             clip=config.clip,
             seed=config.seed + (0 if data_type == "train" else 1),
+            train_start=getattr(config, "train_start", None),
             train_end=getattr(config, "train_end", "2025-06-30"),
             val_end=getattr(config, "val_end", "2026-08-13"),
             n_samples=getattr(config, "n_train_samples" if data_type == "train" else "n_val_samples", None),

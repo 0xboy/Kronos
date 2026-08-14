@@ -51,6 +51,7 @@ from paper.ledger import (
     record_sell,
     save_ledger,
 )
+from paper.models import DEFAULT_PAPER_MODEL, model_label, resolve_model_id
 from paper.signals import device_summary, load_predictor, score_symbol
 from paper.sizing import allocate_budget, conviction, plan_rebalance
 from paper.universe import UNIVERSE_100
@@ -160,7 +161,14 @@ def parse_args() -> argparse.Namespace:
         default=LEDGER_DEFAULT,
         help="Sleeve ledger JSON (holdings + trades)",
     )
-    p.add_argument("--model", default="NeoQuasar/Kronos-small")
+    p.add_argument(
+        "--model",
+        default=DEFAULT_PAPER_MODEL,
+        help=(
+            "Model alias or path. Aliases: spus-small-v1 (default FT), "
+            "stock-small, stock-base, or any HF/local checkpoint path."
+        ),
+    )
     return p.parse_args()
 
 
@@ -233,7 +241,10 @@ def main() -> int:
 
     print(f"Universe: {len(symbols)} symbols")
     print(f"Mode: {'DRY-RUN' if dry_run else 'SUBMIT PAPER ORDERS'}")
-    print(f"Model: {args.model} | lookback={args.lookback} pred_len={args.pred_len}")
+    print(
+        f"Model: {model_label(args.model)} [{args.model}] -> {resolve_model_id(args.model)} "
+        f"| lookback={args.lookback} pred_len={args.pred_len}"
+    )
     print(f"Ledger: {args.ledger}")
     hw = device_summary(args.device)
     print(
@@ -679,6 +690,8 @@ def main() -> int:
             "rebalance": bool(args.rebalance),
             "min_trade": args.min_trade,
             "model": args.model,
+            "model_label": model_label(args.model),
+            "model_path": resolve_model_id(args.model),
             "device": hw,
             "symbols": symbols,
         },

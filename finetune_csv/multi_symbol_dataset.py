@@ -25,6 +25,7 @@ class MultiSymbolKlineDataset(Dataset):
         predict_window: int = 1,
         clip: float = 5.0,
         seed: int = 42,
+        train_start: str | None = None,
         train_end: str = "2025-06-30",
         val_end: str = "2026-08-13",
         n_samples: int | None = None,
@@ -37,6 +38,7 @@ class MultiSymbolKlineDataset(Dataset):
         self.window = lookback_window + predict_window + 1
         self.clip = clip
         self.seed = seed
+        self.train_start = pd.Timestamp(train_start) if train_start else None
         self.train_end = pd.Timestamp(train_end)
         self.val_end = pd.Timestamp(val_end)
         self.py_rng = random.Random(seed)
@@ -103,7 +105,10 @@ class MultiSymbolKlineDataset(Dataset):
                 end_i = i + self.window - 1
                 ts_end = df["timestamps"].iloc[end_i]
                 if self.data_type == "train":
-                    if ts_end <= self.train_end:
+                    # lookback may predate train_start; only the window end is gated
+                    if ts_end <= self.train_end and (
+                        self.train_start is None or ts_end >= self.train_start
+                    ):
                         self.indices.append((sym, i))
                 else:
                     # validation windows whose last bar is after train_end
@@ -114,7 +119,8 @@ class MultiSymbolKlineDataset(Dataset):
         if not self.indices:
             raise RuntimeError(
                 f"No samples for {self.data_type} under {root} "
-                f"(train_end={self.train_end.date()}, val_end={self.val_end.date()})"
+                f"(train_start={None if self.train_start is None else self.train_start.date()}, "
+                f"train_end={self.train_end.date()}, val_end={self.val_end.date()})"
             )
         print(f"[{self.data_type.upper()}] loaded {loaded} symbol CSVs from {root}")
 

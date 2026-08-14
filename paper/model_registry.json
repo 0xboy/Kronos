@@ -1,0 +1,22 @@
+{
+  "alias": "spus-small-v1",
+  "display_name": "SPUS Small v1",
+  "architecture": "Kronos-small",
+  "not_base": true,
+  "tokenizer": "NeoQuasar/Kronos-Tokenizer-base",
+  "checkpoint": "finetune_csv/finetuned/spus_small_v1/basemodel/best_model",
+  "config": {
+    "d_model": 512,
+    "n_layers": 8,
+    "n_heads": 8,
+    "ff_dim": 1024
+  },
+  "training": {
+    "exp_name": "spus_small_v1",
+    "train_start": "2025-05-01",
+    "train_end": "2026-06-30",
+    "val_end": "2026-08-13",
+    "predictor_only": true
+  },
+  "paper_default_since": "2026-08-14"
+}
