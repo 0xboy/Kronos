@@ -1,22 +1,15 @@
-"""Fetch / check Yahoo caches for SPUS100, XK100, commodities, and crypto (separate folders).
+"""Fetch / check Yahoo caches for top-10 exchanges, crypto, commodities.
 
-  # download equity universes
-  .venv/Scripts/python.exe scripts/fetch_yahoo_cache.py
+  # 2020+ for FT prep (default start)
+  .venv/Scripts/python.exe scripts/fetch_yahoo_cache.py --universe ftpack --start 2020-01-01 --refresh
 
-  # commodities as TRY/gram
-  .venv/Scripts/python.exe scripts/fetch_yahoo_cache.py --universe commodities
+  # equities only (top 10 boards)
+  .venv/Scripts/python.exe scripts/fetch_yahoo_cache.py --universe top10 --start 2020-01-01
 
-  # crypto (USD)
-  .venv/Scripts/python.exe scripts/fetch_yahoo_cache.py --universe crypto
-
-  # only check what we already have
-  .venv/Scripts/python.exe scripts/fetch_yahoo_cache.py --check
-
-  # force re-download
-  .venv/Scripts/python.exe scripts/fetch_yahoo_cache.py --refresh
-
-  # wipe CSVs then re-download (after splits etc.)
-  .venv/Scripts/python.exe scripts/fetch_yahoo_cache.py --universe spus --purge
+  # legacy
+  .venv/Scripts/python.exe scripts/fetch_yahoo_cache.py --universe both
+  .venv/Scripts/python.exe scripts/fetch_yahoo_cache.py --universe crypto --start 2020-01-01
+  .venv/Scripts/python.exe scripts/fetch_yahoo_cache.py --universe commodities --start 2020-01-01
 """
 from __future__ import annotations
 
@@ -30,6 +23,7 @@ sys.path.insert(0, str(ROOT))
 
 from paper.commodities import COMMODITY_LABELS, get_commodity_try_gram_bars
 from paper.crypto import CRYPTO_LABELS
+from paper.top_exchanges import EXCHANGES, TOP10_IDS
 from paper.universe import SPUS100, XK100
 from paper.yahoo_cache import (
     CACHE_ROOT,
@@ -41,11 +35,22 @@ from paper.yahoo_cache import (
 
 
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="Yahoo cache fetch/check for SPUS + XK100 + commodities + crypto")
+    p = argparse.ArgumentParser(description="Yahoo cache fetch/check")
     p.add_argument(
         "--universe",
-        choices=("spus", "xk100", "commodities", "crypto", "both", "all"),
-        default="both",
+        choices=(
+            "spus",
+            "xk100",
+            "commodities",
+            "crypto",
+            "both",
+            "all",
+            "top10",
+            "ftpack",
+            *TOP10_IDS,
+        ),
+        default="ftpack",
+        help="ftpack = top10 + crypto + commodities (default)",
     )
     p.add_argument("--check", action="store_true", help="Only report cache status")
     p.add_argument("--refresh", action="store_true", help="Force re-download")
@@ -55,26 +60,50 @@ def parse_args() -> argparse.Namespace:
         help="Delete universe CSV cache before download (implies refresh)",
     )
     p.add_argument("--max-age-days", type=int, default=1)
-    p.add_argument("--period", default="2y")
+    p.add_argument(
+        "--period",
+        default=None,
+        help="Yahoo period if --start not set (e.g. 2y, 5y, max)",
+    )
+    p.add_argument(
+        "--start",
+        default="2020-01-01",
+        help="Download from this date (YYYY-MM-DD). Empty string disables.",
+    )
+    p.add_argument("--end", default=None, help="Optional end date YYYY-MM-DD")
     return p.parse_args()
 
 
 def symbols_for(universe: str) -> list[str]:
-    if universe == "spus":
+    if universe == "spus" or universe == "us":
         return list(SPUS100)
     if universe == "commodities":
         return list(COMMODITY_LABELS)
     if universe == "crypto":
         return list(CRYPTO_LABELS)
+    if universe == "xk100" or universe == "bist":
+        return [f"{t}.IS" for t in XK100]
+    if universe in EXCHANGES:
+        return list(EXCHANGES[universe]["yahoo_symbols"])
     return [f"{t}.IS" for t in XK100]
 
 
+def cache_id_for(universe: str) -> str:
+    if universe in EXCHANGES:
+        return str(EXCHANGES[universe]["cache_id"])
+    return universe
+
+
 def run_one(universe: str, args: argparse.Namespace) -> dict:
+    cache_id = cache_id_for(universe)
     syms = symbols_for(universe)
+    start = args.start or None
+    period = args.period or ("2y" if not start else "max")
+
     if args.check:
-        report = check_cache(universe, syms)
+        report = check_cache(cache_id, syms)
         print(
-            f"[{universe}] dir={report['cache_dir']} files={report['csv_files']} "
+            f"[{cache_id}] dir={report['cache_dir']} files={report['csv_files']} "
             f"ok>={report['ok_ge_400_bars']} thin={report['thin']} "
             f"missing={report['missing_or_empty']}"
         )
@@ -83,33 +112,41 @@ def run_one(universe: str, args: argparse.Namespace) -> dict:
             print(f"  sample issues: {bad}")
         return report
 
-    print(f"=== {universe} | {len(syms)} symbols ===")
-    if args.purge and universe not in ("commodities",):
-        n = purge_universe_cache(universe)
-        print(f"Purged {n} cached CSV files under {universe}")
+    print(f"=== {universe} -> cache={cache_id} | {len(syms)} symbols | start={start} period={period} ===")
+    if args.purge and cache_id not in ("commodities",):
+        n = purge_universe_cache(cache_id)
+        print(f"Purged {n} cached CSV files under {cache_id}")
         args.refresh = True
-    if universe == "commodities":
+
+    if cache_id == "commodities":
         bars = get_commodity_try_gram_bars(
-            period=args.period,
+            period=period,
+            start=start,
+            end=args.end,
             refresh=args.refresh,
             max_age_days=args.max_age_days,
         )
+        # check_cache expects label names for commodities
+        report = check_cache(cache_id, list(COMMODITY_LABELS))
     else:
         bars = get_yahoo_bars(
-            universe,
+            cache_id,
             syms,
-            period=args.period,
+            period=period,
+            start=start,
+            end=args.end,
             refresh=args.refresh,
             max_age_days=args.max_age_days,
         )
-    report = check_cache(universe, syms)
+        report = check_cache(cache_id, syms)
+
     print(
-        f"[{universe}] available {len(bars)}/{len(syms)} | "
+        f"[{cache_id}] available {len(bars)}/{len(syms)} | "
         f"ok>={report['ok_ge_400_bars']} thin={report['thin']} "
         f"missing={report['missing_or_empty']}"
     )
-    if universe in ("spus", "xk100"):
-        cliffs = scan_cache_discontinuities(universe, syms, max_abs_ret=0.40)
+    if cache_id in ("spus", "xk100") or cache_id in {EXCHANGES[k]["cache_id"] for k in TOP10_IDS}:
+        cliffs = scan_cache_discontinuities(cache_id, syms if cache_id != "commodities" else None, max_abs_ret=0.40)
         if cliffs:
             print(f"WARNING: {len(cliffs)} series still have |daily ret|>40%:")
             for row in cliffs[:10]:
@@ -121,12 +158,20 @@ def run_one(universe: str, args: argparse.Namespace) -> dict:
 
 def main() -> int:
     args = parse_args()
+    if args.start == "":
+        args.start = None
+
     if args.universe == "both":
         universes = ["spus", "xk100"]
     elif args.universe == "all":
         universes = ["spus", "xk100", "commodities", "crypto"]
+    elif args.universe == "top10":
+        universes = list(TOP10_IDS)
+    elif args.universe == "ftpack":
+        universes = list(TOP10_IDS) + ["crypto", "commodities"]
     else:
         universes = [args.universe]
+
     reports = {u: run_one(u, args) for u in universes}
     out = ROOT / "paper_results" / "tests" / "yahoo_cache_check.json"
     out.parent.mkdir(exist_ok=True)

@@ -112,21 +112,35 @@ def _to_kronos_frame(sdf: pd.DataFrame) -> pd.DataFrame | None:
     return df if len(df) else None
 
 
-def download_yahoo(symbols: list[str], period: str = "2y") -> dict[str, pd.DataFrame]:
-    """Download daily bars. auto_adjust=True → split+dividend adjusted closes."""
+def download_yahoo(
+    symbols: list[str],
+    period: str = "2y",
+    *,
+    start: str | None = None,
+    end: str | None = None,
+) -> dict[str, pd.DataFrame]:
+    """Download daily bars. auto_adjust=True → split+dividend adjusted closes.
+
+    If ``start`` is set (YYYY-MM-DD), Yahoo date range is used instead of ``period``.
+    """
     out: dict[str, pd.DataFrame] = {}
     chunk = 40
     for i in range(0, len(symbols), chunk):
         part = symbols[i : i + chunk]
         print(f"  yahoo download {i + 1}-{i + len(part)} / {len(symbols)}")
-        data = yf.download(
-            part,
-            period=period,
-            group_by="ticker",
-            auto_adjust=True,
-            threads=True,
-            progress=False,
-        )
+        kwargs: dict = {
+            "group_by": "ticker",
+            "auto_adjust": True,
+            "threads": True,
+            "progress": False,
+        }
+        if start:
+            kwargs["start"] = start
+            if end:
+                kwargs["end"] = end
+        else:
+            kwargs["period"] = period
+        data = yf.download(part, **kwargs)
         for sym in part:
             try:
                 if isinstance(data.columns, pd.MultiIndex) and sym in data.columns.get_level_values(0):
@@ -206,8 +220,11 @@ def get_yahoo_bars(
     symbols: list[str],
     *,
     period: str = "2y",
+    start: str | None = None,
+    end: str | None = None,
     refresh: bool = False,
     max_age_days: int = 1,
+    min_bars: int = 50,
 ) -> dict[str, pd.DataFrame]:
     """Load from disk cache; download only missing / stale / refresh=True."""
     symbols = list(symbols)
@@ -227,14 +244,22 @@ def get_yahoo_bars(
                 need.append(sym)
                 continue
             df = load_symbol(universe, sym)
-            if df is None or len(df) < 50:
+            if df is None or len(df) < min_bars:
                 need.append(sym)
             else:
+                # If caller asked for history from ``start``, re-pull thin caches.
+                if start and len(df) > 0:
+                    first = pd.to_datetime(df["timestamps"].iloc[0])
+                    want = pd.Timestamp(start)
+                    if first > want + pd.Timedelta(days=60):
+                        need.append(sym)
+                        continue
                 cached[sym] = df
 
     if need:
-        print(f"Cache miss/stale: {len(need)}/{len(symbols)} — downloading from Yahoo...")
-        fresh = download_yahoo(need, period=period)
+        label = f"start={start}" if start else f"period={period}"
+        print(f"Cache miss/stale: {len(need)}/{len(symbols)} — downloading from Yahoo ({label})...")
+        fresh = download_yahoo(need, period=period, start=start, end=end)
         for sym, df in fresh.items():
             save_symbol(universe, sym, df)
             cached[sym] = df

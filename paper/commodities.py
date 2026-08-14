@@ -67,12 +67,21 @@ FX_YAHOO = "USDTRY=X"
 UNIVERSE_ID = "commodities"
 
 
-def _fx_series(period: str = "2y", refresh: bool = False, max_age_days: int = 1) -> pd.Series:
+def _fx_series(
+    period: str = "2y",
+    refresh: bool = False,
+    max_age_days: int = 1,
+    *,
+    start: str | None = None,
+    end: str | None = None,
+) -> pd.Series:
     """Daily USDTRY close indexed by naive date."""
     raw = get_yahoo_bars(
         UNIVERSE_ID,
         [FX_YAHOO],
         period=period,
+        start=start,
+        end=end,
         refresh=refresh,
         max_age_days=max_age_days,
     )
@@ -104,16 +113,26 @@ def _to_try_per_gram(df: pd.DataFrame, fx: pd.Series, divisor_g: float) -> pd.Da
 def get_commodity_try_gram_bars(
     *,
     period: str = "2y",
+    start: str | None = None,
+    end: str | None = None,
     refresh: bool = False,
     max_age_days: int = 1,
 ) -> dict[str, pd.DataFrame]:
     """Download futures + USDTRY, convert to TRY/g, cache under commodities/LABEL.csv."""
-    fx = _fx_series(period=period, refresh=refresh, max_age_days=max_age_days)
+    fx = _fx_series(
+        period=period,
+        refresh=refresh,
+        max_age_days=max_age_days,
+        start=start,
+        end=end,
+    )
     yahoo_syms = [m["yahoo"] for m in COMMODITY_META.values()]
     raw = get_yahoo_bars(
         UNIVERSE_ID,
         yahoo_syms,
         period=period,
+        start=start,
+        end=end,
         refresh=refresh,
         max_age_days=max_age_days,
     )

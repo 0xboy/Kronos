@@ -127,6 +127,11 @@ class CustomFinetuneConfig:
         self.train_ratio = data_config.get('train_ratio', 0.9)
         self.val_ratio = data_config.get('val_ratio', 0.1)
         self.test_ratio = data_config.get('test_ratio', 0.0)
+        self.train_end = data_config.get('train_end', '2025-06-30')
+        self.val_end = data_config.get('val_end', '2026-08-13')
+        self.n_train_samples = data_config.get('n_train_samples', 8000)
+        self.n_val_samples = data_config.get('n_val_samples', 2000)
+        self.min_bars = data_config.get('min_bars', 450)
         
         # training configuration
         training_config = self.loader.get_training_config()
