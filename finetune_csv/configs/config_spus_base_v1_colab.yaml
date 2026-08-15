@@ -6,7 +6,7 @@
 #   /content/drive/MyDrive/kronos/data/spus/*.csv
 #   /content/drive/MyDrive/kronos/finetuned/spus_base_v1/...
 #
-# If OOM on T4: set batch_size to 4 (or accumulation_steps: 2).
+# Colab T4 validated: batch_size 32 (~13/15 GB). Drop to 16/8 on OOM.
 
 data:
   data_path: "/content/drive/MyDrive/kronos/data/spus"
@@ -27,7 +27,7 @@ data:
 training:
   tokenizer_epochs: 0
   basemodel_epochs: 10
-  batch_size: 4
+  batch_size: 32
   log_interval: 50
   num_workers: 0
   seed: 42
@@ -36,7 +36,7 @@ training:
   adam_beta1: 0.9
   adam_beta2: 0.95
   adam_weight_decay: 0.1
-  accumulation_steps: 2
+  accumulation_steps: 1
 
 model_paths:
   pretrained_tokenizer: "NeoQuasar/Kronos-Tokenizer-base"
@@ -50,7 +50,7 @@ model_paths:
 
 experiment:
   name: "spus_base_v1_colab"
-  description: "SPUS Base v1 on Colab Free T4; tokenizer frozen; bs=4 accum=2"
+  description: "SPUS Base v1 on Colab Free T4; tokenizer frozen; bs=32"
   use_comet: false
   train_tokenizer: false
   train_basemodel: true

@@ -1,6 +1,6 @@
 """Named paper/inference model aliases.
 
-FT checkpoint is Kronos-small architecture (d_model=512), not Kronos-base.
+Local FT checkpoints: spus-small-v1 (Kronos-small) and spus-base-v1 (Kronos-base).
 """
 from __future__ import annotations
 
@@ -21,9 +21,17 @@ MODEL_ALIASES: dict[str, str] = {
         / "basemodel"
         / "best_model"
     ),
+    "spus-base-v1": str(
+        ROOT
+        / "finetune_csv"
+        / "finetuned"
+        / "spus_base_v1"
+        / "basemodel"
+        / "best_model"
+    ),
 }
 
-DEFAULT_PAPER_MODEL = "spus-small-v1"
+DEFAULT_PAPER_MODEL = "spus-base-v1"
 DEFAULT_TOKENIZER = "NeoQuasar/Kronos-Tokenizer-base"
 DEFAULT_MAX_CONTEXT = 512
 
@@ -61,6 +69,21 @@ MODEL_META: dict[str, dict] = {
             "tokenizer frozen (Tokenizer-base)."
         ),
     },
+    "spus-base-v1": {
+        "display_name": "SPUS Base v1",
+        "architecture": "Kronos-base",
+        "tokenizer": "NeoQuasar/Kronos-Tokenizer-base",
+        "max_context": 512,
+        "source_exp": "spus_base_v1",
+        "train_start": "2025-05-01",
+        "train_end": "2026-06-30",
+        "val_end": "2026-08-13",
+        "best_val_loss": 2.3455,
+        "notes": (
+            "Predictor-only fine-tune of Kronos-base on SPUS daily bars "
+            "(Colab T4, batch 32, 10 epochs); tokenizer frozen (Tokenizer-base)."
+        ),
+    },
 }
 
 
@@ -93,6 +116,10 @@ def _meta_for(name: str | None) -> dict:
     resolved = resolve_model_id(key).lower().replace("\\", "/")
     if "kronos-mini" in resolved or resolved.endswith("/kronos-mini"):
         return MODEL_META["stock-mini"]
+    if "spus_base_v1" in resolved or "spus-base-v1" in resolved:
+        return MODEL_META["spus-base-v1"]
+    if "spus_small_v1" in resolved or "spus-small-v1" in resolved:
+        return MODEL_META["spus-small-v1"]
     if "kronos-base" in resolved or resolved.endswith("/kronos-base"):
         return MODEL_META["stock-base"]
     if "kronos-small" in resolved or resolved.endswith("/kronos-small"):
