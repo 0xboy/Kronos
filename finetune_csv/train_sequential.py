@@ -145,13 +145,31 @@ class SequentialTrainer:
         
         return True
     
+    @staticmethod
+    def _tokenizer_source_available(path: str) -> bool:
+        """Local dir/file must exist; Hugging Face hub ids (org/name) are OK as-is."""
+        if not path:
+            return False
+        if os.path.exists(path):
+            return True
+        # Hub repo id, e.g. NeoQuasar/Kronos-Tokenizer-base
+        if (
+            isinstance(path, str)
+            and "/" in path
+            and not os.path.isabs(path)
+            and not path.startswith((".", "~"))
+            and "\\" not in path
+        ):
+            return True
+        return False
+
     def train_basemodel_phase(self):
         print("\n" + "="*60)
         print("Starting Basemodel Fine-tuning Phase")
         print("="*60)
         
         if getattr(self.config, 'pre_trained_tokenizer', True):
-            if not os.path.exists(self.config.finetuned_tokenizer_path):
+            if not self._tokenizer_source_available(self.config.finetuned_tokenizer_path):
                 raise FileNotFoundError(f"Fine-tuned tokenizer does not exist: {self.config.finetuned_tokenizer_path}")
         
         _, basemodel_exists = self._check_existing_models()
