@@ -54,6 +54,10 @@ Desktop.ini
 *.pt
 *.ckpt
 *.bin
+*.safetensors
+
+# Fine-tune run artifacts (keep configs in git; weights stay local/Drive)
+finetune_csv/finetuned/
 
 # Logs
 *.log
