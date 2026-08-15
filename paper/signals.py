@@ -7,7 +7,12 @@ import pandas as pd
 import torch
 
 from model import Kronos, KronosPredictor, KronosTokenizer
-from paper.models import model_label, resolve_model_id
+from paper.models import (
+    model_label,
+    resolve_max_context,
+    resolve_model_id,
+    resolve_tokenizer_id,
+)
 
 
 @dataclass
@@ -70,9 +75,12 @@ def load_predictor(model_id: str = "spus-small-v1", device: str | None = None) -
             "Warning: CPU-only torch build detected. For GPU: "
             "pip install --force-reinstall torch --index-url https://download.pytorch.org/whl/cu128"
         )
-    tokenizer = KronosTokenizer.from_pretrained("NeoQuasar/Kronos-Tokenizer-base")
+    tokenizer_id = resolve_tokenizer_id(model_id)
+    max_context = resolve_max_context(model_id)
+    print(f"Tokenizer: {tokenizer_id} | max_context={max_context}")
+    tokenizer = KronosTokenizer.from_pretrained(tokenizer_id)
     model = Kronos.from_pretrained(checkpoint)
-    return KronosPredictor(model, tokenizer, device=resolved, max_context=512)
+    return KronosPredictor(model, tokenizer, device=resolved, max_context=max_context)
 
 
 def _one_predict(
