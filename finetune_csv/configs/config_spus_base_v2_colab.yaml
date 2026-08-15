@@ -1,0 +1,73 @@
+# SPUS Base v2 — Colab Free (T4). Fixes the v1 signal collapse.
+# Local twin: config_spus_base_v2.yaml
+#
+# v1 -> v2 changes:
+#   loss_last_n: 1   only the position inference actually consumes carries loss.
+#                    v1 supervised all 401 positions, so ~99.75% of the gradient
+#                    went into replaying history and the model regressed to the
+#                    unconditional daily-return distribution (cross-sectional
+#                    prediction spread collapsed 11.4% -> 2.5%, IC 0.06 -> 0.00).
+#   val_end          moved off the July-August backtest window so checkpoint
+#                    selection no longer sees the evaluation period.
+#
+# Drive layout:
+#   /content/drive/MyDrive/kronos/data/spus/*.csv
+#   /content/drive/MyDrive/kronos/finetuned/spus_base_v2/...
+#
+# Colab T4 validated: batch_size 32 (~13/15 GB). Drop to 16/8 on OOM.
+
+data:
+  data_path: "/content/drive/MyDrive/kronos/data/spus"
+  lookback_window: 400
+  predict_window: 1
+  max_context: 512
+  clip: 5.0
+  train_ratio: 0.9
+  val_ratio: 0.1
+  test_ratio: 0.0
+  # window-end calendar split (lookback may predate train_start)
+  train_start: "2025-05-01"
+  train_end: "2026-05-15"
+  val_end: "2026-06-30"
+  n_train_samples: 8000
+  n_val_samples: 2000
+  min_bars: 450
+
+training:
+  tokenizer_epochs: 0
+  basemodel_epochs: 10
+  batch_size: 32
+  log_interval: 50
+  num_workers: 0
+  seed: 42
+  tokenizer_learning_rate: 0.0002
+  predictor_learning_rate: 0.00001
+  adam_beta1: 0.9
+  adam_beta2: 0.95
+  adam_weight_decay: 0.1
+  accumulation_steps: 1
+  loss_last_n: 1
+
+model_paths:
+  pretrained_tokenizer: "NeoQuasar/Kronos-Tokenizer-base"
+  pretrained_predictor: "NeoQuasar/Kronos-base"
+  finetuned_tokenizer: "NeoQuasar/Kronos-Tokenizer-base"
+  exp_name: "spus_base_v2"
+  base_path: "/content/drive/MyDrive/kronos/finetuned"
+  base_save_path: ""
+  tokenizer_save_name: "tokenizer"
+  basemodel_save_name: "basemodel"
+
+experiment:
+  name: "spus_base_v2_colab"
+  description: "SPUS Base v2 on Colab Free T4; tokenizer frozen; bs=32; loss_last_n=1; val ends 2026-06-30"
+  use_comet: false
+  train_tokenizer: false
+  train_basemodel: true
+  skip_existing: false
+  pre_trained_tokenizer: true
+  pre_trained_predictor: true
+
+device:
+  use_cuda: true
+  device_id: 0

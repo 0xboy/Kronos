@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Run from WSL with Colab CLI (no browser training loop).
+# Run from WSL with Colab CLI — SPUS Small v2 (loss_last_n=1).
 # Prereq: uv tool install google-colab-cli && colab auth flow once
 #
 # Usage:
-#   bash scripts/colab_train_base.sh
+#   bash scripts/colab_train_small.sh
 set -euo pipefail
 
-SESSION="${COLAB_SESSION:-kronos-base}"
+SESSION="${COLAB_SESSION:-kronos-small}"
 GPU="${COLAB_GPU:-T4}"
 
 echo "==> new session $SESSION gpu=$GPU"
@@ -31,7 +31,7 @@ PY
 echo "==> install deps"
 colab install -s "$SESSION" einops==0.8.1 huggingface_hub==0.33.1 safetensors==0.6.2 tqdm pyyaml matplotlib
 
-echo "==> train base (runtime paths patched for Drive)"
+echo "==> train small v2 (runtime paths patched for Drive)"
 colab exec -s "$SESSION" <<'PY'
 import os
 from pathlib import Path
@@ -45,15 +45,18 @@ out = root / "finetuned"
 assert data.exists() and len(list(data.glob("*.csv"))) >= 50, f"missing SPUS csv under {data}"
 
 os.chdir("/content/Kronos/finetune_csv")
-with open("configs/config_spus_base_v2_colab.yaml", encoding="utf-8") as f:
+with open("configs/config_spus_small_v2_colab.yaml", encoding="utf-8") as f:
     cfg = yaml.safe_load(f)
 cfg["data"]["data_path"] = str(data)
 cfg["model_paths"]["base_path"] = str(out)
-rt = Path("configs/config_spus_base_v2_colab_runtime.yaml")
+rt = Path("configs/config_spus_small_v2_colab_runtime.yaml")
 with open(rt, "w", encoding="utf-8") as f:
     yaml.safe_dump(cfg, f, sort_keys=False)
 print("data", data, "csv", len(list(data.glob('*.csv'))))
 print("out", out)
+print("loss_last_n", cfg["training"].get("loss_last_n"))
+print("batch_size", cfg["training"].get("batch_size"))
+print("exp", cfg["model_paths"].get("exp_name"))
 PY
 
 colab exec -s "$SESSION" <<'PY'
@@ -61,10 +64,10 @@ import os, subprocess
 os.chdir("/content/Kronos/finetune_csv")
 subprocess.check_call([
     "python", "train_sequential.py",
-    "--config", "configs/config_spus_base_v2_colab_runtime.yaml",
+    "--config", "configs/config_spus_small_v2_colab_runtime.yaml",
     "--skip-tokenizer",
 ])
 PY
 
-echo "==> done. Checkpoint on Drive: kronos/finetuned/spus_base_v2/basemodel/best_model/"
+echo "==> done. Checkpoint on Drive: kronos/finetuned/spus_small_v2/basemodel/best_model/"
 echo "    Leave session up or: colab stop -s $SESSION"

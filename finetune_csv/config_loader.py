@@ -155,6 +155,10 @@ class CustomFinetuneConfig:
         self.adam_beta2 = training_config.get('adam_beta2', 0.95)
         self.adam_weight_decay = training_config.get('adam_weight_decay', 0.1)
         self.accumulation_steps = training_config.get('accumulation_steps', 1)
+        # Positions at the end of each window that carry loss. 0 = every position.
+        # Inference only ever consumes the final `predict_window` step(s), so
+        # supervising the whole window spends ~all gradient on replaying history.
+        self.loss_last_n = training_config.get('loss_last_n', 0)
         
         model_paths = self.loader.get_model_paths()
         self.exp_name = model_paths.get('exp_name', 'default_experiment')

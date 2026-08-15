@@ -31,7 +31,7 @@ MODEL_ALIASES: dict[str, str] = {
     ),
 }
 
-DEFAULT_PAPER_MODEL = "spus-base-v1"
+DEFAULT_PAPER_MODEL = "stock-base"
 DEFAULT_TOKENIZER = "NeoQuasar/Kronos-Tokenizer-base"
 DEFAULT_MAX_CONTEXT = 512
 
