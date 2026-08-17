@@ -111,12 +111,14 @@ def archive_current_week(
     names = files or list(LIVE_NAMES)
     copied: list[str] = []
 
-    # Prefer moving/copying from root into the week folder when week lacks a file.
+    # Pull root artifacts into the week folder, but never let a stale root mirror
+    # (e.g. last week's card, mirrored during --check) clobber a fresher week file.
     for name in names:
         dest_file = dest / name
         root_file = FORECASTS / name
         if root_file.exists():
-            shutil.copy2(root_file, dest_file)
+            if not dest_file.exists() or root_file.stat().st_mtime >= dest_file.stat().st_mtime:
+                shutil.copy2(root_file, dest_file)
             copied.append(name)
         elif dest_file.exists():
             copied.append(name)

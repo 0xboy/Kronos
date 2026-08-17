@@ -58,7 +58,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--top", type=int, default=10)
     p.add_argument("--sample-count", type=int, default=0, help="0 = 1 (SPUS) / DEFAULT_CFG (XK100)")
     p.add_argument("--pool", type=int, default=0, help="XK100 ADV pool before score (0 = DEFAULT_CFG)")
-    p.add_argument("--model", default="NeoQuasar/Kronos-small")
+    p.add_argument("--model", default="stock-base")
     p.add_argument("--device", default="auto", help="auto/cuda/cpu")
     p.add_argument(
         "--tag",

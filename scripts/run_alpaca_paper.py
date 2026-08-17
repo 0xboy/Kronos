@@ -165,8 +165,8 @@ def parse_args() -> argparse.Namespace:
         "--model",
         default=DEFAULT_PAPER_MODEL,
         help=(
-            "Model alias or path. Aliases: spus-small-v1 (default FT), "
-            "stock-small, stock-base, or any HF/local checkpoint path."
+            "Model alias or path. Default: stock-base (NeoQuasar/Kronos-base). "
+            "Also: stock-small, stock-mini, or any HF/local checkpoint path."
         ),
     )
     return p.parse_args()

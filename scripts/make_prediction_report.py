@@ -22,6 +22,7 @@ TESTS = RESULTS / "tests"
 from paper.commodities import COMMODITY_META  # noqa: E402
 from paper.crypto import CRYPTO_META  # noqa: E402
 from paper.forecast_week import live_dir, live_path, mirror_to_root, read_current_week_id  # noqa: E402
+from paper.models import DEFAULT_PAPER_MODEL, model_label  # noqa: E402
 from paper.xk100_rank import DEFAULT_CFG, cfg_to_dict  # noqa: E402
 
 
@@ -154,7 +155,8 @@ def main() -> int:
 
     report: dict = {
         "ts": datetime.now(timezone.utc).isoformat(),
-        "model": "NeoQuasar/Kronos-small",
+        "model": model_label(DEFAULT_PAPER_MODEL),
+        "model_id": DEFAULT_PAPER_MODEL,
         "pred_len_days": 5,
         "week_id": read_current_week_id(),
         "note": (
@@ -164,7 +166,13 @@ def main() -> int:
         ),
     }
     for key in keys:
-        report[key] = block_from(key, args.top)
+        block = block_from(key, args.top)
+        # Prefer the model that actually scored this universe, if present.
+        mid = (block.get("params") or {}).get("model")
+        if mid:
+            report["model"] = mid if isinstance(mid, str) else model_label(DEFAULT_PAPER_MODEL)
+            report["model_id"] = mid if isinstance(mid, str) else DEFAULT_PAPER_MODEL
+        report[key] = block
 
     if args.universe == "commodities":
         out = week / "prediction_report_commodities.json"

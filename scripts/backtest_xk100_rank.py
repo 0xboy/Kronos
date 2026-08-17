@@ -47,7 +47,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--pred-len", type=int, default=5)
     p.add_argument("--sample-count", type=int, default=5)
     p.add_argument("--top", type=int, default=10, help="Top-N picks scored per window/cfg")
-    p.add_argument("--model", default="NeoQuasar/Kronos-small")
+    p.add_argument("--model", default="stock-base")
     p.add_argument("--limit-symbols", type=int, default=0, help="Debug: first N of XK100")
     p.add_argument("--max-age-days", type=int, default=7)
     return p.parse_args()

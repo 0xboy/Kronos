@@ -41,7 +41,11 @@ def parse_args() -> argparse.Namespace:
         default=0,
         help="Kronos sample paths (0 = 1 for most markets, DEFAULT_CFG for xk100)",
     )
-    p.add_argument("--model", default="NeoQuasar/Kronos-small")
+    p.add_argument(
+        "--model",
+        default="stock-base",
+        help="Model alias or HF/local path (default: stock-base = NeoQuasar/Kronos-base)",
+    )
     p.add_argument(
         "--device",
         default="auto",

@@ -222,7 +222,9 @@ def write_forecast_report_txt(
     from paper.forecast_week import format_sleeve_block, iso_week_id, sleeve_example
 
     lines: list[str] = []
-    model = (card.get("model") or "NeoQuasar/Kronos-small").replace("NeoQuasar/", "")
+    from paper.models import DEFAULT_PAPER_MODEL
+
+    model = (card.get("model") or DEFAULT_PAPER_MODEL).replace("NeoQuasar/", "")
     asof = card.get("asof_last_close", "?")
     target = card.get("target_check_date", "?")
     status = (check or {}).get("status")

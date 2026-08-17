@@ -21,6 +21,10 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 ROOT = Path(__file__).resolve().parents[1]  # repo root
+sys.path.insert(0, str(ROOT))
+
+from paper.models import DEFAULT_PAPER_MODEL
+
 STATE_PATH = ROOT / "paper_results" / "ops" / "loop_state.json"
 STOP_PATH = ROOT / "paper_results" / "ops" / "STOP_LOOP"
 LOG_PATH = ROOT / "paper_results" / "ops" / "loop.log"
@@ -80,7 +84,7 @@ def run_once(
     submit: bool,
     notional: float,
     device: str = "auto",
-    model: str = "spus-small-v1",
+    model: str = DEFAULT_PAPER_MODEL,
 ) -> int:
     cmd = [
         str(PYTHON),
@@ -119,8 +123,8 @@ def parse_args() -> argparse.Namespace:
     )
     p.add_argument(
         "--model",
-        default="spus-small-v1",
-        help="Pass-through model alias/path (default: spus-small-v1)",
+        default=DEFAULT_PAPER_MODEL,
+        help=f"Pass-through model alias/path (default: {DEFAULT_PAPER_MODEL})",
     )
     p.add_argument(
         "--hour",
@@ -155,7 +159,7 @@ def install_windows_task() -> None:
         "@echo off\r\n"
         f'cd /d "{ROOT}"\r\n'
         f'"{PYTHON}" "{ROOT / "scripts" / "run_alpaca_loop.py"}" '
-        f"--once --limit 0 --notional 0 --device auto --model spus-small-v1 --submit >> "
+        f"--once --limit 0 --notional 0 --device auto --model {DEFAULT_PAPER_MODEL} --submit >> "
         f'"{ops / "task.log"}" 2>&1\r\n',
         encoding="utf-8",
     )

@@ -1,22 +1,17 @@
 {
-  "alias": "spus-small-v1",
-  "display_name": "SPUS Small v1",
-  "architecture": "Kronos-small",
-  "not_base": true,
+  "alias": "stock-base",
+  "display_name": "Kronos stock base",
+  "architecture": "Kronos-base",
+  "not_base": false,
   "tokenizer": "NeoQuasar/Kronos-Tokenizer-base",
-  "checkpoint": "finetune_csv/finetuned/spus_small_v1/basemodel/best_model",
+  "checkpoint": "NeoQuasar/Kronos-base",
   "config": {
-    "d_model": 512,
-    "n_layers": 8,
-    "n_heads": 8,
-    "ff_dim": 1024
+    "d_model": 832,
+    "n_layers": 12,
+    "n_heads": 16,
+    "ff_dim": 2048
   },
-  "training": {
-    "exp_name": "spus_small_v1",
-    "train_start": "2025-05-01",
-    "train_end": "2026-06-30",
-    "val_end": "2026-08-13",
-    "predictor_only": true
-  },
-  "paper_default_since": "2026-08-14"
+  "training": null,
+  "paper_default_since": "2026-08-17",
+  "note": "Live paper + weekly forecasts use Hugging Face Kronos-base. Local SPUS FT retired."
 }

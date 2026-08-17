@@ -8,15 +8,17 @@ set -euo pipefail
 
 SESSION="${COLAB_SESSION:-kronos-small}"
 GPU="${COLAB_GPU:-T4}"
+# Prefer ADC (gcloud application-default). oauth2 often drops Colab scopes.
+AUTH="${COLAB_AUTH:---auth=adc}"
 
-echo "==> new session $SESSION gpu=$GPU"
-colab new -s "$SESSION" --gpu "$GPU"
+echo "==> new session $SESSION gpu=$GPU ($AUTH)"
+colab $AUTH new -s "$SESSION" --gpu "$GPU"
 
-echo "==> mount Drive"
-colab drivemount -s "$SESSION"
+echo "==> mount Drive (interactive Google picker may open)"
+colab $AUTH drivemount -s "$SESSION"
 
 echo "==> clone / pull repo on VM"
-colab exec -s "$SESSION" <<'PY'
+colab $AUTH exec -s "$SESSION" <<'PY'
 from pathlib import Path
 import subprocess
 repo = Path("/content/Kronos")
@@ -29,10 +31,10 @@ print("ok", repo)
 PY
 
 echo "==> install deps"
-colab install -s "$SESSION" einops==0.8.1 huggingface_hub==0.33.1 safetensors==0.6.2 tqdm pyyaml matplotlib
+colab $AUTH install -s "$SESSION" einops==0.8.1 huggingface_hub==0.33.1 safetensors==0.6.2 tqdm pyyaml matplotlib
 
 echo "==> train small v2 (runtime paths patched for Drive)"
-colab exec -s "$SESSION" <<'PY'
+colab $AUTH exec -s "$SESSION" <<'PY'
 import os
 from pathlib import Path
 import yaml
@@ -59,7 +61,7 @@ print("batch_size", cfg["training"].get("batch_size"))
 print("exp", cfg["model_paths"].get("exp_name"))
 PY
 
-colab exec -s "$SESSION" <<'PY'
+colab $AUTH exec -s "$SESSION" <<'PY'
 import os, subprocess
 os.chdir("/content/Kronos/finetune_csv")
 subprocess.check_call([

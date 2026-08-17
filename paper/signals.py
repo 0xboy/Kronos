@@ -8,6 +8,7 @@ import torch
 
 from model import Kronos, KronosPredictor, KronosTokenizer
 from paper.models import (
+    DEFAULT_PAPER_MODEL,
     model_label,
     resolve_max_context,
     resolve_model_id,
@@ -63,7 +64,9 @@ def device_summary(device: str | None = None) -> dict:
     return info
 
 
-def load_predictor(model_id: str = "spus-small-v1", device: str | None = None) -> KronosPredictor:
+def load_predictor(model_id: str | None = None, device: str | None = None) -> KronosPredictor:
+    if model_id is None or not str(model_id).strip():
+        model_id = DEFAULT_PAPER_MODEL
     resolved = resolve_device(device)
     summary = device_summary(resolved)
     label = summary.get("gpu") or resolved
