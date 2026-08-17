@@ -34,6 +34,7 @@ from paper.broker import (
     position_qty,
     submit_market_buy,
     submit_market_sell,
+    wait_for_orders,
 )
 from paper.config import load_settings
 from paper.data import (
@@ -394,8 +395,15 @@ def main() -> int:
                 )
             already.discard(s.symbol)
 
-    if not dry_run and any(o.get("submitted") for o in orders if o["side"] == "sell"):
-        time.sleep(2)
+    initial_sell_ids = [
+        str(o["order_id"])
+        for o in orders
+        if o["side"] == "sell" and o.get("submitted") and o.get("order_id")
+    ]
+    if not dry_run and initial_sell_ids:
+        print(f"Waiting for {len(initial_sell_ids)} sell fills...")
+        sell_status = wait_for_orders(trade, initial_sell_ids)
+        print("  Sell states: " + ", ".join(sorted(sell_status.values())))
         snap = account_snapshot(trade)
         try:
             alpaca_positions = list_positions(trade)
@@ -580,8 +588,17 @@ def main() -> int:
             qty = min(ledger_q, broker_q) if broker_q > 0 else ledger_q
             _submit_sell(s, qty, tag="rotate_out")
 
-        if not dry_run and exits:
-            time.sleep(1.5)
+        rotate_sell_ids = [
+            str(o["order_id"])
+            for o in orders
+            if o.get("tag") == "rotate_out"
+            and o.get("submitted")
+            and o.get("order_id")
+        ]
+        if not dry_run and rotate_sell_ids:
+            print(f"Waiting for {len(rotate_sell_ids)} rotation sell fills...")
+            rotate_status = wait_for_orders(trade, rotate_sell_ids)
+            print("  Rotation states: " + ", ".join(sorted(rotate_status.values())))
             snap = account_snapshot(trade)
             try:
                 alpaca_positions = list_positions(trade)
@@ -629,15 +646,32 @@ def main() -> int:
             f"(mode={args.weight_mode}, max_w={args.max_weight:.0%}, "
             f"min_trade=${args.min_trade:.0f}, leftover=${leftover:.2f})"
         )
-        for s, side, qty, notional, tgt_v, cur_v in trades:
+        sell_trades = [t for t in trades if t[1] == "sell"]
+        buy_trades = [t for t in trades if t[1] == "buy"]
+        rebalance_sell_ids: list[str] = []
+        for s, side, qty, notional, tgt_v, cur_v in sell_trades:
             print(
                 f"  plan {side.upper():4} {s.symbol}: qty={qty} "
                 f"~${notional:.0f}  cur=${cur_v:.0f} -> tgt=${tgt_v:.0f}"
             )
-            if side == "sell":
-                _submit_sell(s, float(qty), tag="rebalance_trim")
-            else:
-                _submit_buy(s, int(qty), float(notional), tag="rebalance_add")
+            before = len(orders)
+            _submit_sell(s, float(qty), tag="rebalance_trim")
+            if len(orders) > before:
+                order = orders[-1]
+                if order.get("submitted") and order.get("order_id"):
+                    rebalance_sell_ids.append(str(order["order_id"]))
+
+        if not dry_run and rebalance_sell_ids:
+            print(f"Waiting for {len(rebalance_sell_ids)} rebalance trim fills...")
+            trim_status = wait_for_orders(trade, rebalance_sell_ids)
+            print("  Trim states: " + ", ".join(sorted(trim_status.values())))
+
+        for s, side, qty, notional, tgt_v, cur_v in buy_trades:
+            print(
+                f"  plan {side.upper():4} {s.symbol}: qty={qty} "
+                f"~${notional:.0f}  cur=${cur_v:.0f} -> tgt=${tgt_v:.0f}"
+            )
+            _submit_buy(s, int(qty), float(notional), tag="rebalance_add")
     else:
         # Legacy: only deploy leftover cash into new names; holds untouched.
         buy_budget = deployable

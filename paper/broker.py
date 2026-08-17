@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import time
 
 from alpaca.common.exceptions import APIError
 from alpaca.trading.client import TradingClient
-from alpaca.trading.enums import OrderSide, TimeInForce
+from alpaca.trading.enums import OrderSide, OrderStatus, TimeInForce
 from alpaca.trading.requests import MarketOrderRequest
 
 
@@ -16,6 +17,53 @@ class OrderResult:
     submitted: bool
     order_id: str | None
     message: str
+
+
+TERMINAL_ORDER_STATUSES = {
+    OrderStatus.FILLED,
+    OrderStatus.CANCELED,
+    OrderStatus.EXPIRED,
+    OrderStatus.REJECTED,
+    OrderStatus.REPLACED,
+    OrderStatus.STOPPED,
+    OrderStatus.SUSPENDED,
+}
+
+
+def wait_for_orders(
+    client: TradingClient,
+    order_ids: list[str],
+    *,
+    timeout: float = 90.0,
+    poll_interval: float = 1.0,
+) -> dict[str, str]:
+    """Wait until submitted orders reach terminal states or timeout.
+
+    Returns the last known status per order. A timeout is non-fatal so callers
+    can refresh positions/cash and size conservatively from what actually filled.
+    """
+    pending = {str(order_id) for order_id in order_ids if order_id}
+    statuses: dict[str, str] = {}
+    deadline = time.monotonic() + max(0.0, timeout)
+
+    while pending:
+        for order_id in list(pending):
+            try:
+                order = client.get_order_by_id(order_id)
+                status = order.status
+                statuses[order_id] = str(getattr(status, "value", status))
+                if status in TERMINAL_ORDER_STATUSES:
+                    pending.remove(order_id)
+            except APIError as exc:
+                statuses[order_id] = f"api_error:{exc}"
+
+        if not pending or time.monotonic() >= deadline:
+            break
+        time.sleep(max(0.1, poll_interval))
+
+    for order_id in pending:
+        statuses[order_id] = f"timeout:{statuses.get(order_id, 'unknown')}"
+    return statuses
 
 
 def make_trading_client(api_key: str, secret_key: str, paper: bool = True) -> TradingClient:
