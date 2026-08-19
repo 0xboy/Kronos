@@ -1,0 +1,10 @@
+---
+description: Trive manuel BIST sleeve canlı kuralları
+globs: paper_results/manual_sleeve/**
+alwaysApply: false
+---
+
+Manuel sleeve: `paper_results/manual_sleeve/RULES.md`.
+Kelly yedek kapalı (`RULES_deferred.md`) — kullanıcı “Kelly’ye geç” demeden yok.
+Erken-hit yeniden koşu açık (bölüm 4). Hit’te yeni pred > son ise satma. Taban/tavan alınmaz. Kitapta olan top3’e ek serbest.
+Alpaca paper karışmaz. Kesir lot sleeve hesabına girmez.
