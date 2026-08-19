@@ -640,10 +640,10 @@ def load_model():
             return jsonify({'error': f'Unsupported model: {model_key}'}), 400
         
         model_config = AVAILABLE_MODELS[model_key]
-        
-        # Load tokenizer and model
-        tokenizer = KronosTokenizer.from_pretrained(model_config['tokenizer_id'])
-        model = Kronos.from_pretrained(model_config['model_id'])
+        from paper.models import _prefer_local
+
+        tokenizer = KronosTokenizer.from_pretrained(_prefer_local(model_config['tokenizer_id']))
+        model = Kronos.from_pretrained(_prefer_local(model_config['model_id']))
         
         # Create predictor
         predictor = KronosPredictor(model, tokenizer, device=device, max_context=model_config['context_length'])

@@ -12,6 +12,7 @@ from __future__ import annotations
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+PRETRAINED_DIR = ROOT / "pretrained"
 
 # Short CLI / paper names → Hugging Face id or local checkpoint path.
 MODEL_ALIASES: dict[str, str] = {
@@ -23,6 +24,26 @@ MODEL_ALIASES: dict[str, str] = {
 DEFAULT_PAPER_MODEL = "stock-base"
 DEFAULT_TOKENIZER = "NeoQuasar/Kronos-Tokenizer-base"
 DEFAULT_MAX_CONTEXT = 512
+
+_HF_TO_LOCAL_NAME = {
+    "NeoQuasar/Kronos-mini": "Kronos-mini",
+    "NeoQuasar/Kronos-small": "Kronos-small",
+    "NeoQuasar/Kronos-base": "Kronos-base",
+    "NeoQuasar/Kronos-Tokenizer-base": "Kronos-Tokenizer-base",
+    "NeoQuasar/Kronos-Tokenizer-2k": "Kronos-Tokenizer-2k",
+}
+
+
+def _prefer_local(hf_or_path: str) -> str:
+    """Use repo pretrained/<name> when config.json is present (offline-safe)."""
+    key = str(hf_or_path).strip()
+    local_name = _HF_TO_LOCAL_NAME.get(key)
+    if local_name is None:
+        return key
+    local = PRETRAINED_DIR / local_name
+    if (local / "config.json").is_file():
+        return str(local)
+    return key
 
 MODEL_META: dict[str, dict] = {
     "stock-mini": {
@@ -52,7 +73,7 @@ def resolve_model_id(name: str | None) -> str:
     if name is None or not str(name).strip():
         name = DEFAULT_PAPER_MODEL
     key = str(name).strip()
-    return MODEL_ALIASES.get(key, key)
+    return _prefer_local(MODEL_ALIASES.get(key, key))
 
 
 def model_label(name: str | None) -> str:
@@ -85,7 +106,7 @@ def _meta_for(name: str | None) -> dict:
 
 def resolve_tokenizer_id(name: str | None) -> str:
     meta = _meta_for(name)
-    return str(meta.get("tokenizer") or DEFAULT_TOKENIZER)
+    return _prefer_local(str(meta.get("tokenizer") or DEFAULT_TOKENIZER))
 
 
 def resolve_max_context(name: str | None) -> int:
