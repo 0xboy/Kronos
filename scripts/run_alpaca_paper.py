@@ -1,5 +1,5 @@
 """
-Kronos + Alpaca paper smoke / 50-stock signal test.
+Kronos + Alpaca paper smoke / SPUS100 signal test.
 
 Usage:
   1) Put keys in .env (ALPACA_API_KEY, ALPACA_SECRET_KEY)
@@ -98,8 +98,8 @@ def seed_ledger_from_latest_run(ledger: dict, broker_syms: set[str]) -> list[str
 
 
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="Kronos Alpaca paper test (50 stocks)")
-    p.add_argument("--limit", type=int, default=0, help="Use first N symbols (0 = all 50)")
+    p = argparse.ArgumentParser(description="Kronos Alpaca paper test (SPUS100)")
+    p.add_argument("--limit", type=int, default=0, help="Use first N symbols (0 = all 100)")
     p.add_argument("--lookback", type=int, default=400)
     p.add_argument("--pred-len", type=int, default=1, help="Forecast horizon in trading days")
     p.add_argument("--min-return", type=float, default=0.01, help="Min predicted return to buy")
