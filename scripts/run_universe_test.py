@@ -22,6 +22,7 @@ sys.path.insert(0, str(ROOT))
 
 from paper.commodities import COMMODITY_META, get_commodity_try_gram_bars
 from paper.crypto import CRYPTO_META
+from paper.models import DEFAULT_PAPER_MODEL
 from paper.signals import device_summary, load_predictor, score_symbol
 from paper.universe import COMMODITIES, CRYPTO, SPUS100, XK100
 from paper.xk100_rank import DEFAULT_CFG, cfg_to_dict, rank_signals
@@ -43,8 +44,8 @@ def parse_args() -> argparse.Namespace:
     )
     p.add_argument(
         "--model",
-        default="stock-base",
-        help="Model alias or HF/local path (default: stock-base = NeoQuasar/Kronos-base)",
+        default=DEFAULT_PAPER_MODEL,
+        help="Model alias or HF/local path (default: stock-small = NeoQuasar/Kronos-small)",
     )
     p.add_argument(
         "--device",

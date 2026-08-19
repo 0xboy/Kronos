@@ -38,7 +38,7 @@ git commit   # completes the merge commit
 
 | Area | Prefer |
 |------|--------|
-| `paper/`, `scripts/run_alpaca_paper.py`, `scripts/track_forecasts.py`, `scripts/run_universe_test.py`, `scripts/make_prediction_report.py`, `scripts/backtest_xk100_rank.py`, `scripts/sync_upstream.ps1` | **Ours** (local paper work) |
+| `paper/`, `scripts/run_alpaca_paper.py`, `scripts/track_forecasts.py`, `scripts/run_universe_test.py`, `scripts/make_prediction_report.py`, `scripts/sync_upstream.ps1` | **Ours** (local paper work) |
 | `model/`, `finetune/`, `webui/`, upstream examples, upstream README | **Theirs** (`upstream/master`) unless you intentionally patched them |
 
 Do not blind-resolve with `git checkout --ours/--theirs` across the whole tree.

@@ -691,6 +691,9 @@
                 const option = document.createElement('option');
                 option.value = key;
                 option.textContent = `${model.name} (${model.params}) - ${model.description}`;
+                if (key === 'kronos-small') {
+                    option.selected = true;
+                }
                 modelSelect.appendChild(option);
             });
         }

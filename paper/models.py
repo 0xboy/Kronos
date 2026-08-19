@@ -1,8 +1,8 @@
 """Named paper/inference model aliases.
 
 Live stack uses Hugging Face stock models only:
-  stock-base  → NeoQuasar/Kronos-base   (default)
-  stock-small → NeoQuasar/Kronos-small
+  stock-small → NeoQuasar/Kronos-small  (default)
+  stock-base  → NeoQuasar/Kronos-base
   stock-mini  → NeoQuasar/Kronos-mini
 
 Local SPUS fine-tunes (spus-*-v1) are retired from paper/forecast defaults.
@@ -21,7 +21,7 @@ MODEL_ALIASES: dict[str, str] = {
     "stock-base": "NeoQuasar/Kronos-base",
 }
 
-DEFAULT_PAPER_MODEL = "stock-base"
+DEFAULT_PAPER_MODEL = "stock-small"
 DEFAULT_TOKENIZER = "NeoQuasar/Kronos-Tokenizer-base"
 DEFAULT_MAX_CONTEXT = 512
 

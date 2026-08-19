@@ -1,17 +1,17 @@
 {
-  "alias": "stock-base",
-  "display_name": "Kronos stock base",
-  "architecture": "Kronos-base",
-  "not_base": false,
+  "alias": "stock-small",
+  "display_name": "Kronos stock small",
+  "architecture": "Kronos-small",
+  "not_base": true,
   "tokenizer": "NeoQuasar/Kronos-Tokenizer-base",
-  "checkpoint": "NeoQuasar/Kronos-base",
+  "checkpoint": "NeoQuasar/Kronos-small",
   "config": {
-    "d_model": 832,
-    "n_layers": 12,
-    "n_heads": 16,
-    "ff_dim": 2048
+    "d_model": 512,
+    "n_layers": 8,
+    "n_heads": 8,
+    "ff_dim": 1024
   },
   "training": null,
-  "paper_default_since": "2026-08-17",
-  "note": "Live paper + weekly forecasts use Hugging Face Kronos-base. Local SPUS FT retired."
+  "paper_default_since": "2026-08-19",
+  "note": "Live paper, weekly forecasts, and BIST sleeve default to Hugging Face Kronos-small. stock-base remains an explicit --model alias."
 }

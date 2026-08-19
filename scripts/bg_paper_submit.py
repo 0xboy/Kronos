@@ -13,6 +13,7 @@ sys.path.insert(0, str(ROOT))
 
 from paper.broker import make_trading_client, market_is_open
 from paper.config import load_settings
+from paper.models import DEFAULT_PAPER_MODEL
 
 LOG = ROOT / "paper_results" / "ops" / "bg_submit.log"
 NY = ZoneInfo("America/New_York")
@@ -32,11 +33,11 @@ def main() -> int:
     log("BG submit armed — waiting for US market open")
     while not market_is_open(client):
         time.sleep(15)
-    log("Market open — running paper submit (full cash, stock-base)")
+    log(f"Market open — running paper submit (full cash, {DEFAULT_PAPER_MODEL})")
     py = ROOT / ".venv" / "Scripts" / "python.exe"
     job = ROOT / "scripts" / "run_alpaca_paper.py"
     rc = subprocess.run(
-        [str(py), str(job), "--notional", "0", "--model", "stock-base", "--submit"],
+        [str(py), str(job), "--notional", "0", "--model", DEFAULT_PAPER_MODEL, "--submit"],
         cwd=str(ROOT),
     ).returncode
     log(f"Done exit={rc}")

@@ -1,7 +1,6 @@
 """XK100 ranking filters: liquidity, price, vol-normalize, sample confidence.
 
-Defaults are seeds; walk-forward (`scripts/backtest_xk100_rank.py`) overwrites
-WINNING values after a grid search. Live reports should use `DEFAULT_CFG`.
+Live reports and the BIST sleeve use `DEFAULT_CFG`.
 """
 from __future__ import annotations
 
@@ -26,8 +25,6 @@ class Xk100RankConfig:
     lookback: int = 400
 
 
-# Locked from paper_results/tests/xk100_rank_backtest.json (2026-08-06 walk-forward).
-# Backtest used sample_count=2 / pool=20 on CPU; live keeps sample_count=5 / pool=50.
 DEFAULT_CFG = Xk100RankConfig()
 
 
@@ -136,19 +133,3 @@ def rank_signals(
         kept.append(attach_score(sig, df, cfg))
     kept.sort(key=lambda s: s.score, reverse=True)
     return kept, drops
-
-
-def top_adv_symbols(
-    bars: dict[str, pd.DataFrame],
-    n: int,
-    *,
-    min_bars: int = 400,
-) -> list[str]:
-    """Pick the n most liquid symbols by ADV20 among those with enough history."""
-    scored: list[tuple[str, float]] = []
-    for sym, df in bars.items():
-        if df is None or len(df) < min_bars:
-            continue
-        scored.append((sym, adv20(df)))
-    scored.sort(key=lambda x: x[1], reverse=True)
-    return [s for s, _ in scored[:n]]
