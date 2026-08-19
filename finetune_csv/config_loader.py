@@ -158,8 +158,8 @@ class CustomFinetuneConfig:
         # Positions at the end of each window that carry loss. 0 = every position.
         # Inference only ever consumes the final `predict_window` step(s), so
         # supervising the whole window spends ~all gradient on replaying history.
-        self.loss_last_n = training_config.get('loss_last_n', 0)
         
+
         model_paths = self.loader.get_model_paths()
         self.exp_name = model_paths.get('exp_name', 'default_experiment')
         self.pretrained_tokenizer_path = model_paths.get('pretrained_tokenizer')

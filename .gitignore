@@ -82,6 +82,5 @@ tmp/
 # Local paper trading / research artifacts
 paper_results/
 data/yahoo_cache/
-data/spus_for_colab.zip
 webui/prediction_results/
 figures/demos/

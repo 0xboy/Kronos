@@ -17,6 +17,9 @@ import yfinance as yf
 ROOT = Path(__file__).resolve().parents[1]
 CACHE_ROOT = ROOT / "data" / "yahoo_cache"
 COLS = ["timestamps", "open", "high", "low", "close", "volume", "amount"]
+# Disk cache is for FT + paper. Default Yahoo window is 2y; that silently
+# replaced 2020+ history. Always prefer this floor unless caller passes start.
+DEFAULT_HISTORY_START = "2020-01-01"
 
 
 def cache_dir(universe: str) -> Path:
@@ -226,10 +229,16 @@ def get_yahoo_bars(
     max_age_days: int = 1,
     min_bars: int = 50,
 ) -> dict[str, pd.DataFrame]:
-    """Load from disk cache; download only missing / stale / refresh=True."""
+    """Load from disk cache; download only missing / stale / refresh=True.
+
+    History floor is 2020-01-01 unless ``start`` is set. A fresh 2y CSV is
+    treated as too short and re-pulled — otherwise FT keeps ~2 years forever.
+    """
     symbols = list(symbols)
     cached: dict[str, pd.DataFrame] = {}
     need: list[str] = []
+    pull_start = start if start else DEFAULT_HISTORY_START
+    want_first = pd.Timestamp(pull_start) + pd.Timedelta(days=60)
 
     if refresh:
         need = list(symbols)
@@ -247,19 +256,16 @@ def get_yahoo_bars(
             if df is None or len(df) < min_bars:
                 need.append(sym)
             else:
-                # If caller asked for history from ``start``, re-pull thin caches.
-                if start and len(df) > 0:
-                    first = pd.to_datetime(df["timestamps"].iloc[0])
-                    want = pd.Timestamp(start)
-                    if first > want + pd.Timedelta(days=60):
-                        need.append(sym)
-                        continue
+                first = pd.to_datetime(df["timestamps"].iloc[0])
+                if first > want_first:
+                    need.append(sym)
+                    continue
                 cached[sym] = df
 
     if need:
-        label = f"start={start}" if start else f"period={period}"
+        label = f"start={pull_start}"
         print(f"Cache miss/stale: {len(need)}/{len(symbols)} — downloading from Yahoo ({label})...")
-        fresh = download_yahoo(need, period=period, start=start, end=end)
+        fresh = download_yahoo(need, period=period, start=pull_start, end=end)
         for sym, df in fresh.items():
             save_symbol(universe, sym, df)
             cached[sym] = df

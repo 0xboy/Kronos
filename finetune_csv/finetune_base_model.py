@@ -19,18 +19,6 @@ from config_loader import CustomFinetuneConfig
 from multi_symbol_dataset import MultiSymbolKlineDataset
 
 
-def build_supervision_mask(batch_size, seq_len, last_n, device):
-    """Mask for head.compute_loss: 0 = supervised, 1 = ignored.
-
-    Returns None when every position should be supervised.
-    """
-    if last_n <= 0 or last_n >= seq_len:
-        return None
-    mask = torch.ones((batch_size, seq_len), dtype=torch.long, device=device)
-    mask[:, -last_n:] = 0
-    return mask
-
-
 class CustomKlineDataset(Dataset):
     def __init__(
         self,
@@ -307,16 +295,6 @@ def train_model(model, tokenizer, device, config, save_dir, logger):
     best_val_loss = float("inf")
     batch_idx_global = 0
 
-    loss_last_n = int(getattr(config, "loss_last_n", 0) or 0)
-    supervision_msg = (
-        f"Loss supervision: last {loss_last_n} position(s) per window"
-        if loss_last_n > 0
-        else "Loss supervision: all positions (full-sequence next-token)"
-    )
-    logger.info(supervision_msg)
-    if rank == 0:
-        print(supervision_msg)
-
     for epoch in range(config.basemodel_epochs):
         epoch_start_time = time.time()
         model.train()
@@ -340,11 +318,8 @@ def train_model(model, tokenizer, device, config, save_dir, logger):
             token_out = [token_seq_0[:, 1:], token_seq_1[:, 1:]]
 
             logits = (model.module if use_ddp else model)(token_in[0], token_in[1], batch_x_stamp[:, :-1, :])
-            pad_mask = build_supervision_mask(
-                token_out[0].shape[0], token_out[0].shape[1], loss_last_n, device
-            )
             loss, s1_loss, s2_loss = (model.module if use_ddp else model).head.compute_loss(
-                logits[0], logits[1], token_out[0], token_out[1], padding_mask=pad_mask
+                logits[0], logits[1], token_out[0], token_out[1]
             )
 
             optimizer.zero_grad()
@@ -382,11 +357,8 @@ def train_model(model, tokenizer, device, config, save_dir, logger):
                 token_out = [token_seq_0[:, 1:], token_seq_1[:, 1:]]
 
                 logits = (model.module if use_ddp else model)(token_in[0], token_in[1], batch_x_stamp[:, :-1, :])
-                pad_mask = build_supervision_mask(
-                    token_out[0].shape[0], token_out[0].shape[1], loss_last_n, device
-                )
                 loss, _, _ = (model.module if use_ddp else model).head.compute_loss(
-                    logits[0], logits[1], token_out[0], token_out[1], padding_mask=pad_mask
+                    logits[0], logits[1], token_out[0], token_out[1]
                 )
 
                 val_loss += loss.item()
