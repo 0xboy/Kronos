@@ -3,21 +3,20 @@
 Uses Yahoo data from disk cache (runtime/yahoo_cache/) — no re-download each run.
 Markets stay separate. Commodities are priced in TRY per gram; crypto in USD.
 
-  .venv/Scripts/python.exe scripts/fetch_yahoo_cache.py          # once
-  .venv/Scripts/python.exe scripts/run_universe_test.py --universe spus
-  .venv/Scripts/python.exe scripts/run_universe_test.py --universe xk100
-  .venv/Scripts/python.exe scripts/run_universe_test.py --universe commodities
-  .venv/Scripts/python.exe scripts/run_universe_test.py --universe crypto
+  python main.py cache          # once
+  python main.py universe --universe spus
+  python main.py universe --universe xk100
+  python main.py universe --universe commodities
+  python main.py universe --universe crypto
 """
 from __future__ import annotations
 
+from config.paths import PAPER_RESULTS
 import argparse
 import json
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-
-ROOT = Path(__file__).resolve().parents[1]  # repo root
 
 from universes.commodities import COMMODITY_META, get_commodity_try_gram_bars
 from universes.crypto import CRYPTO_META
@@ -269,7 +268,7 @@ def main() -> int:
         "skipped": skipped,
         "filter_drops": filter_drops,
     }
-    out_dir = ROOT / "runtime" / "paper_results" / "tests"
+    out_dir = PAPER_RESULTS / "tests"
     out_dir.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     path = out_dir / f"test_{market['id']}_{stamp}.json"
@@ -278,5 +277,8 @@ def main() -> int:
     return 0
 
 
-if __name__ == "__main__":
+def console_main() -> None:
     raise SystemExit(main())
+
+if __name__ == "__main__":
+    console_main()

@@ -11,6 +11,7 @@ Stop:
 """
 from __future__ import annotations
 
+from config.paths import PAPER_RESULTS, REPO_ROOT
 import argparse
 import json
 import subprocess
@@ -20,16 +21,14 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-ROOT = Path(__file__).resolve().parents[1]  # repo root
-
 from inference.models import DEFAULT_PAPER_MODEL
 
-STATE_PATH = ROOT / "runtime" / "paper_results" / "ops" / "loop_state.json"
-STOP_PATH = ROOT / "runtime" / "paper_results" / "ops" / "STOP_LOOP"
-LOG_PATH = ROOT / "runtime" / "paper_results" / "ops" / "loop.log"
+ROOT = REPO_ROOT
+STATE_PATH = PAPER_RESULTS / "ops" / "loop_state.json"
+STOP_PATH = PAPER_RESULTS / "ops" / "STOP_LOOP"
+LOG_PATH = PAPER_RESULTS / "ops" / "loop.log"
 NY = ZoneInfo("America/New_York")
 PYTHON = ROOT / ".venv" / "Scripts" / "python.exe"
-JOB = ROOT / "scripts" / "run_alpaca_paper.py"
 
 # Slightly after the 09:30 ET open so the auction settles.
 DEFAULT_HOUR = 9
@@ -87,7 +86,8 @@ def run_once(
 ) -> int:
     cmd = [
         str(PYTHON),
-        str(JOB),
+        str(ROOT / "main.py"),
+        "paper",
         "--limit",
         str(limit),
         "--notional",
@@ -151,13 +151,13 @@ def parse_args() -> argparse.Namespace:
 
 def install_windows_task() -> None:
     """Register weekday Task Scheduler job near US market open."""
-    ops = ROOT / "runtime" / "paper_results" / "ops"
+    ops = PAPER_RESULTS / "ops"
     ops.mkdir(parents=True, exist_ok=True)
     bat = ops / "daily_job.bat"
     bat.write_text(
         "@echo off\r\n"
         f'cd /d "{ROOT}"\r\n'
-        f'"{PYTHON}" "{ROOT / "scripts" / "run_alpaca_loop.py"}" '
+        f'"{PYTHON}" "{ROOT / "main.py"}" paper-loop '
         f"--once --limit 0 --notional 0 --device auto --model {DEFAULT_PAPER_MODEL} --submit >> "
         f'"{ops / "task.log"}" 2>&1\r\n',
         encoding="utf-8",
@@ -282,5 +282,8 @@ def main() -> int:
             time.sleep(10)
 
 
-if __name__ == "__main__":
+def console_main() -> None:
     raise SystemExit(main())
+
+if __name__ == "__main__":
+    console_main()

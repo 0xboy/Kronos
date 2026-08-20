@@ -1,20 +1,19 @@
 """Build clean top-N prediction reports from latest universe test runs.
 
-  .venv/Scripts/python.exe scripts/make_prediction_report.py
-  .venv/Scripts/python.exe scripts/make_prediction_report.py --universe commodities
-  .venv/Scripts/python.exe scripts/make_prediction_report.py --universe all
+  python main.py forecast-report
+  python main.py forecast-report --universe commodities
+  python main.py forecast-report --universe all
 """
 from __future__ import annotations
 
+from config.paths import PAPER_RESULTS
 import argparse
 import json
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]  # repo root
-
-RESULTS = ROOT / "runtime" / "paper_results"
+RESULTS = PAPER_RESULTS
 FORECASTS = RESULTS / "forecasts"
 TESTS = RESULTS / "tests"
 
@@ -211,5 +210,8 @@ def main() -> int:
     return 0
 
 
-if __name__ == "__main__":
+def console_main() -> None:
     raise SystemExit(main())
+
+if __name__ == "__main__":
+    console_main()

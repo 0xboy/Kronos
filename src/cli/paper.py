@@ -3,9 +3,9 @@ Kronos + Alpaca paper smoke / SPUS100 signal test.
 
 Usage:
   1) Put keys in .env (ALPACA_API_KEY, ALPACA_SECRET_KEY)
-  2) Dry-run (default):   .venv/Scripts/python.exe scripts/run_alpaca_paper.py
-  3) Submit paper buys:   .venv/Scripts/python.exe scripts/run_alpaca_paper.py --submit
-  4) Quick 5-symbol test: .venv/Scripts/python.exe scripts/run_alpaca_paper.py --limit 5
+  2) Dry-run (default):   python main.py paper
+  3) Submit paper buys:   python main.py paper --submit
+  4) Quick 5-symbol test: python main.py paper --limit 5
 
 Portfolio sleeve:
   --notional 0      → deploy all account cash/equity into score-weighted rebalance (default)
@@ -18,13 +18,11 @@ from __future__ import annotations
 import argparse
 import json
 import math
-import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]  # repo root
-
+from config.paths import PAPER_RESULTS, REPO_ROOT
 from trading.broker import (
     account_snapshot,
     list_positions,
@@ -53,47 +51,18 @@ from trading.ledger import (
 )
 from inference.models import DEFAULT_PAPER_MODEL, model_label, resolve_model_id
 from inference.signals import DEFAULT_SAMPLE_COUNT, device_summary, load_predictor, score_symbol
+from trading.rebalance import (
+    compute_deployable,
+    compute_sleeve_budget,
+    select_cash_add_candidates,
+    select_rebalance_target,
+    signals_flagged_to_sell,
+    sleeve_kept_value,
+)
 from trading.sizing import allocate_budget, conviction, plan_rebalance
 from universes.universe import UNIVERSE_100
 
-
-def seed_ledger_from_latest_run(ledger: dict, broker_syms: set[str]) -> list[str]:
-    """If sleeve is empty, adopt historical submit buys still held at the broker."""
-    if holding_symbols(ledger):
-        return []
-    runs = sorted((ROOT / "runtime" / "paper_results" / "runs").glob("run_*.json"), reverse=True)
-    claimed: set[str] = set()
-    seeded: list[str] = []
-    for path in runs:
-        try:
-            data = json.loads(path.read_text(encoding="utf-8"))
-        except Exception:  # noqa: BLE001
-            continue
-        if data.get("dry_run", True):
-            continue
-        for o in data.get("orders", []):
-            if o.get("side") != "buy" or not o.get("submitted"):
-                continue
-            sym = o["symbol"]
-            if sym not in broker_syms or sym in claimed:
-                continue
-            qty = float(o.get("qty") or 0)
-            px = float(o.get("last_close") or 0)
-            if qty <= 0 or px <= 0:
-                continue
-            record_buy(
-                ledger,
-                symbol=sym,
-                qty=qty,
-                price=px,
-                order_id=o.get("order_id"),
-                expected_return=o.get("expected_return"),
-                run_id=f"seed:{path.name}",
-            )
-            claimed.add(sym)
-            seeded.append(sym)
-    return seeded
-
+ROOT = REPO_ROOT
 
 
 def parse_args() -> argparse.Namespace:
@@ -176,52 +145,6 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     return p.parse_args()
-
-
-def _mark_kept_value(
-    ledger_syms: set[str],
-    alpaca_by_sym: dict[str, dict],
-    signal_price: dict[str, float],
-) -> float:
-    total = 0.0
-    for sym in ledger_syms:
-        if sym in alpaca_by_sym:
-            total += float(alpaca_by_sym[sym]["market_value"])
-        elif sym in signal_price:
-            total += holding_qty  # placeholder — fixed below
-    # recompute properly
-    total = 0.0
-    for sym in ledger_syms:
-        qty = None
-        px = None
-        if sym in alpaca_by_sym:
-            total += float(alpaca_by_sym[sym]["market_value"])
-            continue
-        # fallback: ledger qty * last signal/close
-        from trading.ledger import load_ledger as _  # noqa: F401 — avoid circular; use caller qty map
-
-        px = signal_price.get(sym)
-        if px is None:
-            continue
-    return total
-
-
-def sleeve_kept_value(
-    held: set[str],
-    qty_by_sym: dict[str, float],
-    alpaca_by_sym: dict[str, dict],
-    signal_price: dict[str, float],
-) -> float:
-    total = 0.0
-    for sym in held:
-        if sym in alpaca_by_sym:
-            total += float(alpaca_by_sym[sym]["market_value"])
-            continue
-        px = signal_price.get(sym)
-        qty = qty_by_sym.get(sym, 0.0)
-        if px is not None and qty > 0:
-            total += qty * px
-    return total
 
 
 def main() -> int:
@@ -355,11 +278,7 @@ def main() -> int:
         print(f"{s.symbol:6} {s.expected_return:+7.2%}  {flag}")
 
     # 1) Sell only sleeve holdings that flipped below threshold
-    sells = [
-        s
-        for s in signals
-        if s.symbol in already and s.expected_return < args.sell_below
-    ]
+    sells = signals_flagged_to_sell(signals, already, args.sell_below)
     # Also sell sleeve holds we couldn't score (optional: keep them). Keep unscored.
     orders: list[dict] = []
     print(f"\nSelected sells: {len(sells)} (sell_below={args.sell_below:.2%})")
@@ -440,25 +359,19 @@ def main() -> int:
         buying_power += sold_notional
 
     # Alpaca rejects if cost > buying_power; cash can look higher than BP briefly.
-    deployable = min(cash, buying_power)
-    deployable = max(0.0, deployable * 0.995)
+    deployable = compute_deployable(cash, buying_power)
 
     budget_cap = float(args.notional)
-    if budget_cap > 0:
-        sleeve_budget = budget_cap
-        budget_label = f"sleeve_cap=${budget_cap:.0f} kept=${kept_value:.0f} cash=${cash:.0f}"
-        ledger["budget"] = budget_cap
-    else:
-        sleeve_budget = kept_value + deployable
-        budget_label = (
-            f"full-rebalance nav=${sleeve_budget:.0f} "
-            f"kept=${kept_value:.0f} cash=${cash:.0f} bp=${buying_power:.0f}"
-        )
-        ledger["budget"] = float(snap.get("equity") or sleeve_budget)
+    sleeve = compute_sleeve_budget(
+        kept_value,
+        deployable,
+        notional_cap=budget_cap,
+        equity=float(snap.get("equity") or 0) or None,
+    )
+    sleeve_budget = sleeve.sleeve_budget
+    ledger["budget"] = sleeve.ledger_budget
 
-    print(f"\nSleeve budget: ${sleeve_budget:.2f} ({budget_label})")
-
-    by_sym = {s.symbol: s for s in signals}
+    print(f"\nSleeve budget: ${sleeve_budget:.2f} ({sleeve.label})")
 
     def _submit_buy(s, qty: int, cost: float, *, tag: str = "buy") -> None:
         nonlocal already
@@ -569,20 +482,12 @@ def main() -> int:
 
     if args.rebalance:
         # Target = top_k by conviction among names still above min_return.
-        ranked = sorted(
-            [s for s in signals if s.expected_return >= args.min_return],
-            key=lambda s: conviction(s.score, s.expected_return),
-            reverse=True,
+        target, exits = select_rebalance_target(
+            signals,
+            held=already,
+            min_return=args.min_return,
+            top_k=args.top_k,
         )
-        target = ranked[: args.top_k]
-        target_syms = {s.symbol for s in target}
-
-        # Rotate out holds that fell out of top_k (still non-negative but weaker).
-        exits = [
-            by_sym[sym]
-            for sym in sorted(already)
-            if sym not in target_syms and sym in by_sym
-        ]
         print(
             f"\nRebalance target ({len(target)}): "
             + ", ".join(s.symbol for s in target)
@@ -613,13 +518,16 @@ def main() -> int:
                 pass
             cash = float(snap["cash"])
             buying_power = float(snap.get("buying_power") or cash)
-            deployable = max(0.0, min(cash, buying_power) * 0.995)
+            deployable = compute_deployable(cash, buying_power)
             qty_by_sym = {sym: holding_qty(ledger, sym) for sym in already}
             kept_value = sleeve_kept_value(already, qty_by_sym, alpaca_by_sym, signal_price)
-            if budget_cap > 0:
-                sleeve_budget = budget_cap
-            else:
-                sleeve_budget = kept_value + deployable
+            sleeve = compute_sleeve_budget(
+                kept_value,
+                deployable,
+                notional_cap=budget_cap,
+                equity=float(snap.get("equity") or 0) or None,
+            )
+            sleeve_budget = sleeve.sleeve_budget
             print(f"Post-exit sleeve budget: ${sleeve_budget:.2f} (kept=${kept_value:.0f})")
         elif dry_run and exits:
             exit_val = sum(
@@ -627,10 +535,13 @@ def main() -> int:
             )
             kept_value = max(0.0, kept_value - exit_val)
             deployable = deployable + exit_val
-            if budget_cap > 0:
-                sleeve_budget = budget_cap
-            else:
-                sleeve_budget = kept_value + deployable
+            sleeve = compute_sleeve_budget(
+                kept_value,
+                deployable,
+                notional_cap=budget_cap,
+                equity=float(snap.get("equity") or 0) or None,
+            )
+            sleeve_budget = sleeve.sleeve_budget
 
         def _cur_qty(s) -> float:
             if dry_run:
@@ -685,12 +596,13 @@ def main() -> int:
             room = max(0.0, budget_cap - kept_value)
             buy_budget = min(deployable, room)
         print(f"Buy budget (no-rebalance): ${buy_budget:.2f}")
+        candidates = select_cash_add_candidates(
+            signals,
+            held=already,
+            min_return=args.min_return,
+            top_k=args.top_k,
+        )
         buy_slots = max(0, int(args.top_k) - len(already))
-        candidates = [
-            s
-            for s in signals
-            if s.expected_return >= args.min_return and s.symbol not in already
-        ][:buy_slots]
         buys, remaining = allocate_budget(
             candidates,
             buy_budget,
@@ -751,7 +663,7 @@ def main() -> int:
         "skipped": [{"symbol": s, "reason": r} for s, r in skipped],
     }
 
-    out_dir = ROOT / "runtime" / "paper_results" / "runs"
+    out_dir = PAPER_RESULTS / "runs"
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / f"run_{run_id}.json"
     out_path.write_text(json.dumps(out, indent=2), encoding="utf-8")
@@ -765,5 +677,8 @@ def main() -> int:
     return 0
 
 
-if __name__ == "__main__":
+def console_main() -> None:
     raise SystemExit(main())
+
+if __name__ == "__main__":
+    console_main()

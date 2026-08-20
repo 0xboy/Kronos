@@ -6,15 +6,17 @@ Local paper-trading and research layer on top of [Kronos](https://github.com/shi
 ## Layout
 
 ```text
+main.py           Single CLI entry (subcommands)
 src/
+  cli/            Command implementations
   config/         Settings + paths
   inference/      Kronos vendor bridge, models, scoring
   data/           Yahoo cache + Alpaca bars helpers
   universes/      SPUS, XK100, commodities, crypto
   ranking/        XK100 filters / conviction ranking
-  trading/        Alpaca broker, sizing, sleeve ledger
+  trading/        Alpaca broker, sizing, sleeve ledger, rebalance
   forecast/       Weekly forecast cards / reports
-scripts/          CLIs
+scripts/          Ops helpers (e.g. sync_vendor.ps1)
 vendor/kronos/    Official Kronos submodule
 runtime/          Local runtime (gitignored contents)
   yahoo_cache/    Disk OHLCV cache
@@ -23,6 +25,7 @@ runtime/          Local runtime (gitignored contents)
 ```
 
 See [docs/VENDOR.md](docs/VENDOR.md) for submodule sync.
+See [docs/BACKLOG.md](docs/BACKLOG.md) for done / next work.
 
 ## Setup
 
@@ -39,19 +42,19 @@ Copy `.env.example` → `.env` and set Alpaca keys for paper trading.
 ## Common commands
 
 ```powershell
-# Yahoo cache (once / refresh)
-.\.venv\Scripts\python.exe scripts\fetch_yahoo_cache.py --universe xk100
-
-# Score a universe from cache
-.\.venv\Scripts\python.exe scripts\run_universe_test.py --universe xk100
-
-# Alpaca paper dry-run / submit
-.\.venv\Scripts\python.exe scripts\run_alpaca_paper.py
-.\.venv\Scripts\python.exe scripts\run_alpaca_paper.py --submit
-
-# Quick Kronos PNG demo (uses vendor test CSV)
-.\.venv\Scripts\python.exe scripts\run_demo.py
+python main.py --help
+python main.py paper --help
+python main.py cache --universe xk100
+python main.py universe --universe xk100
+python main.py paper
+python main.py paper --submit
+python main.py demo
+python main.py forecast-report
+python main.py forecast-track --freeze
 ```
+
+Same via installed console script: `kronos paper --submit`  
+or module form: `python -m cli paper --submit`
 
 ## Upstream Kronos
 

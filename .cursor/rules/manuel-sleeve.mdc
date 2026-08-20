@@ -10,7 +10,7 @@ Erken-hit yeniden koşu açık (bölüm 4). **Her gün** hit kontrolü (4a): son
 High değdiyse hedef gelmiş sayılır; 4b → pozitif yoksa **FULL sat** (son geri çekilse de).
 Hit’te yeni pred > son **ve** μ>0 ise tut; değilse **FULL sat**.
 Taban/tavan alınmaz. Kitapta olan top3’e ek serbest (cap %20 aşımı nakit).
-**Koşudan önce** Yahoo: `fetch_yahoo_cache.py --universe xk100 --refresh --max-age-days 0` — stale last yasak.
+**Koşudan önce** Yahoo: `python main.py cache --universe xk100 --refresh --max-age-days 0` — stale last yasak.
 Açık satır: maliyet + pred ort (qty-ağırlıklı); dilim/satış ayrı yazılmaz (§5).
 Skor: `DEFAULT_SAMPLE_COUNT=10` (tüm evrenler / Alpaca paper).
 Alpaca paper karışmaz. Kesir lot sleeve hesabına girmez.

@@ -22,9 +22,13 @@ dependencies = [
     "yfinance",
 ]
 
+[project.scripts]
+kronos = "cli.__main__:console_main"
+
 [tool.setuptools.packages.find]
 where = ["src"]
 include = [
+    "cli*",
     "config*",
     "inference*",
     "data*",

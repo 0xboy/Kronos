@@ -1,16 +1,17 @@
 """Freeze today's top predictions, then check them after ~5 trading days.
 
   # freeze current top10 report as a bet card
-  .venv/Scripts/python.exe scripts/track_forecasts.py --freeze
+  python main.py forecast-track --freeze
 
   # later: pull Yahoo and score hits
-  .venv/Scripts/python.exe scripts/track_forecasts.py --check
+  python main.py forecast-track --check
 
   # force refresh Yahoo before check
-  .venv/Scripts/python.exe scripts/track_forecasts.py --check --refresh
+  python main.py forecast-track --check --refresh
 """
 from __future__ import annotations
 
+from config.paths import PAPER_RESULTS, YAHOO_CACHE
 import argparse
 import json
 import sys
@@ -20,9 +21,7 @@ from pathlib import Path
 import pandas as pd
 import yfinance as yf
 
-ROOT = Path(__file__).resolve().parents[1]  # repo root
-
-RESULTS = ROOT / "runtime" / "paper_results"
+RESULTS = PAPER_RESULTS
 FORECASTS = RESULTS / "forecasts"
 TESTS = RESULTS / "tests"
 
@@ -91,8 +90,8 @@ def freeze(report_path: Path) -> Path:
     # last close dates from Yahoo cache if available
     asof = "2026-07-30"
     for sample in (
-        ROOT / "runtime" / "yahoo_cache" / "commodities" / "GOLD.csv",
-        ROOT / "runtime" / "yahoo_cache" / "spus" / "NVDA.csv",
+        YAHOO_CACHE / "commodities" / "GOLD.csv",
+        YAHOO_CACHE / "spus" / "NVDA.csv",
     ):
         try:
             if sample.exists():
@@ -617,5 +616,8 @@ def main() -> int:
     return 0
 
 
-if __name__ == "__main__":
+def console_main() -> None:
     raise SystemExit(main())
+
+if __name__ == "__main__":
+    console_main()

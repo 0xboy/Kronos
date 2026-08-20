@@ -43,7 +43,7 @@ COMMODITIES = list(COMMODITY_LABELS)
 
 CRYPTO = list(CRYPTO_LABELS)
 
-# Backward-compatible alias used by run_alpaca_paper.py
+# Backward-compatible alias used by paper CLI / Alpaca runner
 UNIVERSE_50 = list(SPUS50)
 UNIVERSE_100 = list(SPUS100)
 

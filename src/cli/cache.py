@@ -1,27 +1,26 @@
 """Fetch / check Yahoo caches for top-10 exchanges, crypto, commodities.
 
   # 2020+ for FT prep (default start)
-  .venv/Scripts/python.exe scripts/fetch_yahoo_cache.py --universe ftpack --start 2020-01-01 --refresh
+  python main.py cache --universe ftpack --start 2020-01-01 --refresh
 
   # equities only (top 10 boards)
-  .venv/Scripts/python.exe scripts/fetch_yahoo_cache.py --universe top10 --start 2020-01-01
+  python main.py cache --universe top10 --start 2020-01-01
 
   # legacy
-  .venv/Scripts/python.exe scripts/fetch_yahoo_cache.py --universe both
-  .venv/Scripts/python.exe scripts/fetch_yahoo_cache.py --universe crypto --start 2020-01-01
-  .venv/Scripts/python.exe scripts/fetch_yahoo_cache.py --universe commodities --start 2020-01-01
+  python main.py cache --universe both
+  python main.py cache --universe crypto --start 2020-01-01
+  python main.py cache --universe commodities --start 2020-01-01
 
   # session / experiment checks: realign last 10 bars only if wrong
-  .venv/Scripts/python.exe scripts/fetch_yahoo_cache.py --universe xk100 --align-tail 10
+  python main.py cache --universe xk100 --align-tail 10
 """
 from __future__ import annotations
 
+from config.paths import PAPER_RESULTS
 import argparse
 import json
 import sys
 from pathlib import Path
-
-ROOT = Path(__file__).resolve().parents[1]  # repo root
 
 from universes.commodities import COMMODITY_LABELS, get_commodity_try_gram_bars
 from universes.crypto import CRYPTO_LABELS
@@ -201,7 +200,7 @@ def main() -> int:
         universes = [args.universe]
 
     reports = {u: run_one(u, args) for u in universes}
-    out = ROOT / "runtime" / "paper_results" / "tests" / "yahoo_cache_check.json"
+    out = PAPER_RESULTS / "tests" / "yahoo_cache_check.json"
     out.parent.mkdir(exist_ok=True)
     out.write_text(json.dumps(reports, indent=2), encoding="utf-8")
     print(f"Cache root: {CACHE_ROOT}")
@@ -209,5 +208,8 @@ def main() -> int:
     return 0
 
 
-if __name__ == "__main__":
+def console_main() -> None:
     raise SystemExit(main())
+
+if __name__ == "__main__":
+    console_main()

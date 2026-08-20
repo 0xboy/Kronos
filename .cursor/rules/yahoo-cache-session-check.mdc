@@ -9,7 +9,7 @@ alwaysApply: false
 Experiment hit / yön-hedef check veya seans içi fiyat kontrolünden **önce**:
 
 ```text
-.venv/Scripts/python.exe scripts/fetch_yahoo_cache.py --universe xk100 --align-tail 10
+.venv/Scripts/python.exe main.py cache --universe xk100 --align-tail 10
 ```
 
 - Son **10** günlük barı Yahoo ile karşılaştırır; **sadece yanlış/eksik** olanları yazar (tarih veya close sapması).

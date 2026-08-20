@@ -1,4 +1,6 @@
 """Quick Kronos forecast demo — saves a PNG, no GUI needed."""
+from __future__ import annotations
+
 from pathlib import Path
 
 import matplotlib
@@ -8,21 +10,21 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import torch
 
+from config.paths import PAPER_RESULTS
 from inference.vendor import ensure_vendor_on_path, vendor_kronos_root
 
 ensure_vendor_on_path()
 from model import Kronos, KronosTokenizer, KronosPredictor  # noqa: E402
 
-ROOT = Path(__file__).resolve().parents[1]  # repo root
 VENDOR = vendor_kronos_root()
 DATA = VENDOR / "tests" / "data" / "regression_input.csv"
-OUT = ROOT / "runtime" / "paper_results" / "demos" / "forecast_demo.png"
+OUT = PAPER_RESULTS / "demos" / "forecast_demo.png"
 
 LOOKBACK = 400
 PRED_LEN = 60
 
 
-def main():
+def main() -> int:
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"Device: {device}")
 
@@ -66,7 +68,11 @@ def main():
     fig.tight_layout()
     fig.savefig(OUT, dpi=140)
     print(f"Saved -> {OUT}")
+    return 0
 
+
+def console_main() -> None:
+    raise SystemExit(main())
 
 if __name__ == "__main__":
-    main()
+    console_main()
