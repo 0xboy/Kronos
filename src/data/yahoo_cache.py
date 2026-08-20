@@ -4,15 +4,21 @@ Layout:
   runtime/data/yahoo_cache/spus/AAPL.csv
   runtime/data/yahoo_cache/xk100/ASELS_IS.csv
   runtime/data/yahoo_cache/spus/manifest.json
+
+Fetch uses Yahoo chart HTTP API (not ``yfinance.download``) for stability on
+Windows / Python 3.13 (yfinance+old pandas datetime paths were segfaulting).
 """
 from __future__ import annotations
 
 import json
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 import pandas as pd
-import yfinance as yf
 
 from config.paths import YAHOO_CACHE
 
@@ -21,6 +27,23 @@ COLS = ["timestamps", "open", "high", "low", "close", "volume", "amount"]
 # Disk cache is for FT + paper. Default Yahoo window is 2y; that silently
 # replaced 2020+ history. Always prefer this floor unless caller passes start.
 DEFAULT_HISTORY_START = "2020-01-01"
+
+_CHART_UA = {"User-Agent": "Mozilla/5.0 (compatible; kronos-yahoo-cache/1.0)"}
+_PERIOD_RANGE = {
+    "1d": "1d",
+    "5d": "5d",
+    "10d": "15d",
+    "15d": "15d",
+    "1mo": "1mo",
+    "3mo": "3mo",
+    "6mo": "6mo",
+    "1y": "1y",
+    "2y": "2y",
+    "5y": "5y",
+    "10y": "10y",
+    "ytd": "ytd",
+    "max": "max",
+}
 
 
 def cache_dir(universe: str) -> Path:
@@ -54,66 +77,102 @@ def save_symbol(universe: str, symbol: str, df: pd.DataFrame) -> Path:
     return path
 
 
-def _flatten_ohlcv(sdf: pd.DataFrame) -> pd.DataFrame:
-    """Normalize yfinance single/multi-index OHLCV frames to flat columns."""
-    if sdf is None or sdf.empty:
-        return sdf
-    if isinstance(sdf.columns, pd.MultiIndex):
-        # Two common layouts:
-        #   group_by=ticker -> ('AAPL', 'Close')
-        #   default single  -> ('Close', 'AAPL')
-        level0 = {c[0] for c in sdf.columns}
-        price_names = {"Open", "High", "Low", "Close", "Volume", "Adj Close"}
-        if level0 & price_names:
-            # ('Close', ticker)
-            pick = lambda col: next(  # noqa: E731
-                (c for c in sdf.columns if c[0] == col),
-                None,
-            )
-        else:
-            # ('ticker', 'Close') — take first ticker slice if needed
-            tickers = sorted(level0)
-            t0 = tickers[0]
-            if len(tickers) == 1 and all(c[0] == t0 for c in sdf.columns):
-                pick = lambda col: next(  # noqa: E731
-                    (c for c in sdf.columns if c[1] == col),
-                    None,
-                )
-            else:
-                # Unexpected multi-ticker frame passed as one — leave empty
-                return pd.DataFrame(index=sdf.index)
-
-        flat = {}
-        for col in ("Open", "High", "Low", "Close", "Volume"):
-            key = pick(col)
-            if key is not None:
-                flat[col] = sdf[key]
-        return pd.DataFrame(flat, index=sdf.index)
-    return sdf
-
-
-def _to_kronos_frame(sdf: pd.DataFrame) -> pd.DataFrame | None:
-    if sdf is None or sdf.empty:
+def _to_unix(day: str | None, *, end_of_day: bool = False) -> int | None:
+    if not day:
         return None
-    sdf = _flatten_ohlcv(sdf)
-    if "Close" not in sdf.columns:
-        return None
-    sdf = sdf.dropna(subset=["Close"]).reset_index()
-    ts_col = "Date" if "Date" in sdf.columns else sdf.columns[0]
-    vol = sdf["Volume"] if "Volume" in sdf.columns else 0.0
-    df = pd.DataFrame(
-        {
-            "timestamps": pd.to_datetime(sdf[ts_col]).dt.tz_localize(None),
-            "open": sdf["Open"].astype(float),
-            "high": sdf["High"].astype(float),
-            "low": sdf["Low"].astype(float),
-            "close": sdf["Close"].astype(float),
-            "volume": pd.Series(vol).astype(float).fillna(0.0),
-        }
+    ts = pd.Timestamp(day)
+    if end_of_day:
+        ts = ts + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
+    return int(ts.timestamp())
+
+
+def fetch_yahoo_chart(
+    symbol: str,
+    *,
+    period: str = "2y",
+    start: str | None = None,
+    end: str | None = None,
+    auto_adjust: bool = True,
+    timeout: float = 30.0,
+) -> pd.DataFrame | None:
+    """Daily OHLCV via chart API -> Kronos columns. Returns None on failure."""
+    params: dict[str, str] = {"interval": "1d", "events": "div,splits"}
+    if start:
+        p1 = _to_unix(start)
+        p2 = _to_unix(end, end_of_day=True) if end else int(time.time())
+        if p1 is None or p2 is None:
+            return None
+        params["period1"] = str(p1)
+        params["period2"] = str(p2)
+    else:
+        params["range"] = _PERIOD_RANGE.get(period, period)
+
+    url = (
+        "https://query1.finance.yahoo.com/v8/finance/chart/"
+        + urllib.parse.quote(symbol, safe="=^")
+        + "?"
+        + urllib.parse.urlencode(params)
     )
-    df["amount"] = df["close"] * df["volume"]
-    df = df.dropna().sort_values("timestamps").reset_index(drop=True)
-    return df if len(df) else None
+    req = urllib.request.Request(url, headers=_CHART_UA)
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            payload = json.loads(resp.read().decode())
+    except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, json.JSONDecodeError):
+        return None
+
+    results = (payload.get("chart") or {}).get("result") or []
+    if not results:
+        return None
+    res = results[0]
+    ts = res.get("timestamp") or []
+    if not ts:
+        return None
+    quote = ((res.get("indicators") or {}).get("quote") or [{}])[0]
+    adj_list = ((res.get("indicators") or {}).get("adjclose") or [{}])
+    adj = (adj_list[0].get("adjclose") if adj_list else None) or []
+
+    opens = quote.get("open") or []
+    highs = quote.get("high") or []
+    lows = quote.get("low") or []
+    closes = quote.get("close") or []
+    volumes = quote.get("volume") or []
+
+    rows: list[dict] = []
+    for i, raw_ts in enumerate(ts):
+        c = closes[i] if i < len(closes) else None
+        o = opens[i] if i < len(opens) else None
+        h = highs[i] if i < len(highs) else None
+        lo = lows[i] if i < len(lows) else None
+        if c is None or o is None or h is None or lo is None:
+            continue
+        scale = 1.0
+        if auto_adjust and i < len(adj) and adj[i] is not None and float(c) != 0.0:
+            scale = float(adj[i]) / float(c)
+        vol = float(volumes[i] or 0.0) if i < len(volumes) else 0.0
+        close = float(c) * scale
+        rows.append(
+            {
+                "timestamps": datetime.fromtimestamp(int(raw_ts), tz=timezone.utc)
+                .replace(tzinfo=None)
+                .replace(hour=0, minute=0, second=0, microsecond=0),
+                "open": float(o) * scale,
+                "high": float(h) * scale,
+                "low": float(lo) * scale,
+                "close": close,
+                "volume": vol,
+                "amount": close * vol,
+            }
+        )
+    if not rows:
+        return None
+    df = pd.DataFrame(rows)
+    df = (
+        df.dropna(subset=["open", "high", "low", "close"])
+        .drop_duplicates(subset=["timestamps"], keep="last")
+        .sort_values("timestamps")
+        .reset_index(drop=True)
+    )
+    return df[COLS] if len(df) else None
 
 
 def download_yahoo(
@@ -123,41 +182,16 @@ def download_yahoo(
     start: str | None = None,
     end: str | None = None,
 ) -> dict[str, pd.DataFrame]:
-    """Download daily bars. auto_adjust=True → split+dividend adjusted closes.
-
-    If ``start`` is set (YYYY-MM-DD), Yahoo date range is used instead of ``period``.
-    """
+    """Download daily bars (auto-adjusted) via Yahoo chart API."""
     out: dict[str, pd.DataFrame] = {}
-    chunk = 40
-    for i in range(0, len(symbols), chunk):
-        part = symbols[i : i + chunk]
-        print(f"  yahoo download {i + 1}-{i + len(part)} / {len(symbols)}")
-        kwargs: dict = {
-            "group_by": "ticker",
-            "auto_adjust": True,
-            "threads": True,
-            "progress": False,
-        }
-        if start:
-            kwargs["start"] = start
-            if end:
-                kwargs["end"] = end
-        else:
-            kwargs["period"] = period
-        data = yf.download(part, **kwargs)
-        for sym in part:
-            try:
-                if isinstance(data.columns, pd.MultiIndex) and sym in data.columns.get_level_values(0):
-                    sdf = data[sym].copy()
-                elif len(part) == 1:
-                    sdf = data.copy()
-                else:
-                    sdf = data[sym].copy()
-            except Exception:
-                continue
-            frame = _to_kronos_frame(sdf)
-            if frame is not None:
-                out[sym] = frame
+    n = len(symbols)
+    for i, sym in enumerate(symbols, 1):
+        if i == 1 or i % 20 == 0 or i == n:
+            print(f"  yahoo chart {i}/{n}")
+        frame = fetch_yahoo_chart(sym, period=period, start=start, end=end, auto_adjust=True)
+        if frame is not None:
+            out[sym] = frame
+        time.sleep(0.05)
     return out
 
 

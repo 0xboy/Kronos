@@ -7,9 +7,9 @@ from pathlib import Path
 from typing import Any
 
 import pandas as pd
-import yfinance as yf
 
 from config.paths import FORECASTS, YAHOO_CACHE
+from data.yahoo_cache import fetch_yahoo_chart
 from forecast.week import (
     archive_current_week,
     format_sleeve_block,
@@ -408,18 +408,11 @@ def write_forecast_report_txt(
 
 
 def latest_close(yahoo: str) -> tuple[float | None, str | None]:
-    data = yf.download(yahoo, period="15d", auto_adjust=True, progress=False, threads=False)
-    if data is None or data.empty or "Close" not in data.columns:
+    df = fetch_yahoo_chart(yahoo, period="15d", auto_adjust=True)
+    if df is None or df.empty:
         return None, None
-    close = data["Close"].dropna()
-    if close.empty:
-        return None, None
-    if isinstance(close, pd.DataFrame):
-        close = close.iloc[:, 0]
-    ts = close.index[-1]
-    val = float(close.iloc[-1])
-    day = str(pd.Timestamp(ts).date())
-    return val, day
+    last = df.iloc[-1]
+    return float(last["close"]), str(pd.Timestamp(last["timestamps"]).date())
 
 
 def latest_try_per_gram(symbol: str, yahoo: str) -> tuple[float | None, str | None]:
