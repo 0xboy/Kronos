@@ -1,9 +1,9 @@
 """Yahoo daily OHLCV cache — download once, reuse for Kronos tests.
 
 Layout:
-  data/yahoo_cache/spus/AAPL.csv
-  data/yahoo_cache/xk100/ASELS_IS.csv
-  data/yahoo_cache/spus/manifest.json
+  runtime/yahoo_cache/spus/AAPL.csv
+  runtime/yahoo_cache/xk100/ASELS_IS.csv
+  runtime/yahoo_cache/spus/manifest.json
 """
 from __future__ import annotations
 
@@ -14,8 +14,9 @@ from pathlib import Path
 import pandas as pd
 import yfinance as yf
 
-ROOT = Path(__file__).resolve().parents[2]
-CACHE_ROOT = ROOT / "data" / "yahoo_cache"
+from config.paths import YAHOO_CACHE
+
+CACHE_ROOT = YAHOO_CACHE
 COLS = ["timestamps", "open", "high", "low", "close", "volume", "amount"]
 # Disk cache is for FT + paper. Default Yahoo window is 2y; that silently
 # replaced 2020+ history. Always prefer this floor unless caller passes start.

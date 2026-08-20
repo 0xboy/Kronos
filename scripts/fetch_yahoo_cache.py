@@ -23,11 +23,11 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]  # repo root
 
-from paper.commodities import COMMODITY_LABELS, get_commodity_try_gram_bars
-from paper.crypto import CRYPTO_LABELS
-from paper.top_exchanges import EXCHANGES, TOP10_IDS
-from paper.universe import SPUS100, XK100
-from paper.yahoo_cache import (
+from universes.commodities import COMMODITY_LABELS, get_commodity_try_gram_bars
+from universes.crypto import CRYPTO_LABELS
+from universes.top_exchanges import EXCHANGES, TOP10_IDS
+from universes.universe import SPUS100, XK100
+from data.yahoo_cache import (
     CACHE_ROOT,
     align_last_bars,
     check_cache,
@@ -201,7 +201,7 @@ def main() -> int:
         universes = [args.universe]
 
     reports = {u: run_one(u, args) for u in universes}
-    out = ROOT / "paper_results" / "tests" / "yahoo_cache_check.json"
+    out = ROOT / "runtime" / "paper_results" / "tests" / "yahoo_cache_check.json"
     out.parent.mkdir(exist_ok=True)
     out.write_text(json.dumps(reports, indent=2), encoding="utf-8")
     print(f"Cache root: {CACHE_ROOT}")

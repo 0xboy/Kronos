@@ -10,11 +10,11 @@ from zoneinfo import ZoneInfo
 
 ROOT = Path(__file__).resolve().parents[1]  # repo root
 
-from paper.broker import make_trading_client, market_is_open
-from paper.config import load_settings
-from paper.models import DEFAULT_PAPER_MODEL
+from trading.broker import make_trading_client, market_is_open
+from config.settings import load_settings
+from inference.models import DEFAULT_PAPER_MODEL
 
-LOG = ROOT / "paper_results" / "ops" / "bg_submit.log"
+LOG = ROOT / "runtime" / "paper_results" / "ops" / "bg_submit.log"
 NY = ZoneInfo("America/New_York")
 
 

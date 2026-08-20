@@ -1,6 +1,6 @@
 """Score Kronos on one universe at a time (SPUS100, XK100, commodities, or crypto).
 
-Uses Yahoo data from disk cache (data/yahoo_cache/) — no re-download each run.
+Uses Yahoo data from disk cache (runtime/yahoo_cache/) — no re-download each run.
 Markets stay separate. Commodities are priced in TRY per gram; crypto in USD.
 
   .venv/Scripts/python.exe scripts/fetch_yahoo_cache.py          # once
@@ -19,14 +19,14 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]  # repo root
 
-from paper.commodities import COMMODITY_META, get_commodity_try_gram_bars
-from paper.crypto import CRYPTO_META
-from paper.models import DEFAULT_PAPER_MODEL
-from paper.signals import DEFAULT_SAMPLE_COUNT, device_summary, load_predictor, score_symbol
-from paper.universe import COMMODITIES, CRYPTO, SPUS100, XK100
-from paper.xk100_rank import DEFAULT_CFG, cfg_to_dict, rank_signals
-from paper.yahoo_cache import get_yahoo_bars
-from paper.data import drop_split_discontinuities
+from universes.commodities import COMMODITY_META, get_commodity_try_gram_bars
+from universes.crypto import CRYPTO_META
+from inference.models import DEFAULT_PAPER_MODEL
+from inference.signals import DEFAULT_SAMPLE_COUNT, device_summary, load_predictor, score_symbol
+from universes.universe import COMMODITIES, CRYPTO, SPUS100, XK100
+from ranking.xk100_rank import DEFAULT_CFG, cfg_to_dict, rank_signals
+from data.yahoo_cache import get_yahoo_bars
+from data.bars import drop_split_discontinuities
 
 
 def parse_args() -> argparse.Namespace:
@@ -168,7 +168,7 @@ def main() -> int:
     filter_drops_pre: list[dict] = []
     score_labels = list(labels)
     if use_xk100_rank and xk_cfg is not None:
-        from paper.xk100_rank import passes_filters
+        from ranking.xk100_rank import passes_filters
 
         score_labels = []
         for symbol in labels:
@@ -269,7 +269,7 @@ def main() -> int:
         "skipped": skipped,
         "filter_drops": filter_drops,
     }
-    out_dir = ROOT / "paper_results" / "tests"
+    out_dir = ROOT / "runtime" / "paper_results" / "tests"
     out_dir.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     path = out_dir / f"test_{market['id']}_{stamp}.json"

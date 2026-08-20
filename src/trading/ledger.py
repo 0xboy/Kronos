@@ -1,6 +1,6 @@
 """Persistent sleeve ledger: only positions this strategy bought.
 
-File: paper_results/sleeve_ledger.json
+File: runtime/paper_results/sleeve_ledger.json
 Tracks open holdings + full trade history so the runner never touches
 manual / foreign Alpaca positions outside the sleeve.
 """
@@ -11,7 +11,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-DEFAULT_PATH = Path(__file__).resolve().parents[2] / "paper_results" / "sleeve_ledger.json"
+from config.paths import PAPER_RESULTS
+
+DEFAULT_PATH = PAPER_RESULTS / "sleeve_ledger.json"
 
 
 def _now() -> str:

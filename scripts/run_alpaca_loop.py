@@ -5,7 +5,7 @@ Once per US trading day near the open (09:35 ET / ~16:35 Turkey).
 No day-count limit — runs every weekday until you stop it.
 
 Stop:
-  - create file paper_results/ops/STOP_LOOP
+  - create file runtime/paper_results/ops/STOP_LOOP
   - or Ctrl+C
   - or: schtasks /Delete /TN KronosAlpacaPaperDaily /F
 """
@@ -22,11 +22,11 @@ from zoneinfo import ZoneInfo
 
 ROOT = Path(__file__).resolve().parents[1]  # repo root
 
-from paper.models import DEFAULT_PAPER_MODEL
+from inference.models import DEFAULT_PAPER_MODEL
 
-STATE_PATH = ROOT / "paper_results" / "ops" / "loop_state.json"
-STOP_PATH = ROOT / "paper_results" / "ops" / "STOP_LOOP"
-LOG_PATH = ROOT / "paper_results" / "ops" / "loop.log"
+STATE_PATH = ROOT / "runtime" / "paper_results" / "ops" / "loop_state.json"
+STOP_PATH = ROOT / "runtime" / "paper_results" / "ops" / "STOP_LOOP"
+LOG_PATH = ROOT / "runtime" / "paper_results" / "ops" / "loop.log"
 NY = ZoneInfo("America/New_York")
 PYTHON = ROOT / ".venv" / "Scripts" / "python.exe"
 JOB = ROOT / "scripts" / "run_alpaca_paper.py"
@@ -151,7 +151,7 @@ def parse_args() -> argparse.Namespace:
 
 def install_windows_task() -> None:
     """Register weekday Task Scheduler job near US market open."""
-    ops = ROOT / "paper_results" / "ops"
+    ops = ROOT / "runtime" / "paper_results" / "ops"
     ops.mkdir(parents=True, exist_ok=True)
     bat = ops / "daily_job.bat"
     bat.write_text(

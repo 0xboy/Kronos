@@ -14,15 +14,15 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]  # repo root
 
-RESULTS = ROOT / "paper_results"
+RESULTS = ROOT / "runtime" / "paper_results"
 FORECASTS = RESULTS / "forecasts"
 TESTS = RESULTS / "tests"
 
-from paper.commodities import COMMODITY_META  # noqa: E402
-from paper.crypto import CRYPTO_META  # noqa: E402
-from paper.forecast_week import live_dir, live_path, mirror_to_root, read_current_week_id  # noqa: E402
-from paper.models import DEFAULT_PAPER_MODEL, model_label  # noqa: E402
-from paper.xk100_rank import DEFAULT_CFG, cfg_to_dict  # noqa: E402
+from universes.commodities import COMMODITY_META  # noqa: E402
+from universes.crypto import CRYPTO_META  # noqa: E402
+from forecast.week import live_dir, live_path, mirror_to_root, read_current_week_id  # noqa: E402
+from inference.models import DEFAULT_PAPER_MODEL, model_label  # noqa: E402
+from ranking.xk100_rank import DEFAULT_CFG, cfg_to_dict  # noqa: E402
 
 
 def parse_args() -> argparse.Namespace:

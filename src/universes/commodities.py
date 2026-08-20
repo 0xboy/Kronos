@@ -10,7 +10,7 @@ from typing import Any
 
 import pandas as pd
 
-from paper.yahoo_cache import COLS, download_yahoo, get_yahoo_bars, save_symbol
+from data.yahoo_cache import COLS, download_yahoo, get_yahoo_bars, save_symbol
 
 TROY_OZ_G = 31.1034768
 LB_G = 453.59237

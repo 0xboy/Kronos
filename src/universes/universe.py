@@ -2,13 +2,13 @@
 
 SPUS100 = first 100 holdings of SPUS ETF by weight (US, USD, Sharia)
 XK100   = BIST Katılım 100 from KAP (TR, TRY, Katılım) — separate market
-COMMODITIES = metals priced in TRY/gram (see paper.commodities)
-CRYPTO100   = top cryptocurrencies priced in USD (see paper.crypto)
+COMMODITIES = metals priced in TRY/gram (see universes.commodities)
+CRYPTO100   = top cryptocurrencies priced in USD (see universes.crypto)
 SPUS50 / CRYPTO kept as aliases for older runners.
 """
 
-from paper.commodities import COMMODITY_LABELS
-from paper.crypto import CRYPTO_LABELS
+from universes.commodities import COMMODITY_LABELS
+from universes.crypto import CRYPTO_LABELS
 
 # Schwab SPUS holdings (weight order), as of ~2026-08-06.
 SPUS100 = [

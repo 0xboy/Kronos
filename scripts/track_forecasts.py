@@ -22,14 +22,14 @@ import yfinance as yf
 
 ROOT = Path(__file__).resolve().parents[1]  # repo root
 
-RESULTS = ROOT / "paper_results"
+RESULTS = ROOT / "runtime" / "paper_results"
 FORECASTS = RESULTS / "forecasts"
 TESTS = RESULTS / "tests"
 
 
 def _paths() -> tuple[Path, Path, Path]:
     """Resolve live card/check/report paths for the current week."""
-    from paper.forecast_week import live_path
+    from forecast.week import live_path
 
     return (
         live_path("forecast_card.json"),
@@ -39,7 +39,7 @@ def _paths() -> tuple[Path, Path, Path]:
 
 
 # Defaults resolve at import; freeze/check refresh via _paths().
-from paper.forecast_week import live_path as _live_path  # noqa: E402
+from forecast.week import live_path as _live_path  # noqa: E402
 
 CARD = _live_path("forecast_card.json")
 CHECK = _live_path("forecast_check.json")
@@ -66,7 +66,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def _default_from_report() -> Path:
-    from paper.forecast_week import FORECASTS as F, live_path
+    from forecast.week import FORECASTS as F, live_path
 
     for cand in (
         live_path("prediction_report_all.json"),
@@ -91,8 +91,8 @@ def freeze(report_path: Path) -> Path:
     # last close dates from Yahoo cache if available
     asof = "2026-07-30"
     for sample in (
-        ROOT / "data" / "yahoo_cache" / "commodities" / "GOLD.csv",
-        ROOT / "data" / "yahoo_cache" / "spus" / "NVDA.csv",
+        ROOT / "runtime" / "yahoo_cache" / "commodities" / "GOLD.csv",
+        ROOT / "runtime" / "yahoo_cache" / "spus" / "NVDA.csv",
     ):
         try:
             if sample.exists():
@@ -117,9 +117,9 @@ def freeze(report_path: Path) -> Path:
         "markets": {},
     }
 
-    from paper.commodities import COMMODITY_META
+    from universes.commodities import COMMODITY_META
 
-    from paper.crypto import CRYPTO_META
+    from universes.crypto import CRYPTO_META
 
     for key in ("spus", "xk100", "commodities", "crypto"):
         if key not in report:
@@ -166,7 +166,7 @@ def freeze(report_path: Path) -> Path:
     print(f"Asof last close: {card['asof_last_close']}")
     print(f"Check after:     {card['target_check_date']} (or later)")
     write_forecast_report_txt(card, check=None, source_report=report)
-    from paper.forecast_week import archive_current_week, iso_week_id
+    from forecast.week import archive_current_week, iso_week_id
 
     wid = iso_week_id(card.get("asof_last_close"))
     dest = archive_current_week(week_id=wid, asof=card.get("asof_last_close"))
@@ -218,10 +218,10 @@ def write_forecast_report_txt(
     source_report: dict | None = None,
 ) -> Path:
     """Human-readable tracker matching forecast_report.txt style."""
-    from paper.forecast_week import format_sleeve_block, iso_week_id, sleeve_example
+    from forecast.week import format_sleeve_block, iso_week_id, sleeve_example
 
     lines: list[str] = []
-    from paper.models import DEFAULT_PAPER_MODEL
+    from inference.models import DEFAULT_PAPER_MODEL
 
     model = (card.get("model") or DEFAULT_PAPER_MODEL).replace("NeoQuasar/", "")
     asof = card.get("asof_last_close", "?")
@@ -446,7 +446,7 @@ def write_forecast_report_txt(
 
     lines.append("-" * 72)
     lines.append("Note: These are model forecasts, not guarantees.")
-    lines.append(f"Week archive: paper_results/forecasts/weeks/{week_id}/")
+    lines.append(f"Week archive: runtime/paper_results/forecasts/weeks/{week_id}/")
     lines.append(f"After {target} run:  track_forecasts.py --check")
     lines.append("(check refreshes this txt with Actual close + Actual% / Hit)")
     lines.append("")
@@ -477,8 +477,8 @@ def _latest_close(yahoo: str) -> tuple[float | None, str | None]:
 
 
 def _latest_try_per_gram(symbol: str, yahoo: str) -> tuple[float | None, str | None]:
-    """Convert live Yahoo futures close to TRY/gram using same rules as paper.commodities."""
-    from paper.commodities import COMMODITY_META
+    """Convert live Yahoo futures close to TRY/gram using same rules as universes.commodities."""
+    from universes.commodities import COMMODITY_META
 
     meta = COMMODITY_META.get(symbol)
     if not meta:
@@ -590,7 +590,7 @@ def check(refresh: bool = False) -> Path:  # noqa: ARG001 — reserved
                 f"[{hit}]"
             )
     write_forecast_report_txt(card, check=out)
-    from paper.forecast_week import archive_current_week, iso_week_id
+    from forecast.week import archive_current_week, iso_week_id
 
     wid = iso_week_id(card.get("asof_last_close"))
     dest = archive_current_week(week_id=wid, asof=card.get("asof_last_close"))
@@ -601,7 +601,7 @@ def check(refresh: bool = False) -> Path:  # noqa: ARG001 — reserved
 def main() -> int:
     args = parse_args()
     if args.organize:
-        from paper.forecast_week import organize_forecast_root
+        from forecast.week import organize_forecast_root
 
         info = organize_forecast_root()
         print(f"Organized forecasts/ -> current={info['current_week']}")

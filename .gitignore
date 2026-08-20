@@ -17,6 +17,7 @@ sdist/
 var/
 wheels/
 *.egg-info/
+src/*.egg-info/
 .installed.cfg
 *.egg
 MANIFEST
@@ -49,13 +50,12 @@ Desktop.ini
 *.h5
 *.hdf5
 
-# Model files (large files)
+# Model weight files
 *.pth
 *.pt
 *.ckpt
 *.bin
 *.safetensors
-pretrained/
 
 # Fine-tune run artifacts live under vendor/kronos when used there
 
@@ -79,6 +79,7 @@ temp/
 tmp/
 .python-version
 
-# Local paper trading / research artifacts
-paper_results/
-data/yahoo_cache/
+# Local runtime artifacts (samples/ is tracked)
+runtime/yahoo_cache/
+runtime/paper_results/
+runtime/pretrained/

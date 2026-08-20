@@ -6,8 +6,8 @@ import numpy as np
 import pandas as pd
 import torch
 
-from paper.kronos_vendor import ensure_vendor_on_path
-from paper.models import (
+from inference.vendor import ensure_vendor_on_path
+from inference.models import (
     DEFAULT_PAPER_MODEL,
     model_label,
     resolve_max_context,

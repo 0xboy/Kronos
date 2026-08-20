@@ -24,6 +24,15 @@ dependencies = [
 
 [tool.setuptools.packages.find]
 where = ["src"]
+include = [
+    "config*",
+    "inference*",
+    "data*",
+    "universes*",
+    "ranking*",
+    "trading*",
+    "forecast*",
+]
 
 [tool.setuptools.package-data]
-paper = ["model_registry.json"]
+inference = ["model_registry.json"]

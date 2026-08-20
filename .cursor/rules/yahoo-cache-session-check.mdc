@@ -1,6 +1,6 @@
 ---
 description: Seans/experiment hit check öncesi Yahoo cache son 10 bar hizalama
-globs: paper_results/experiments/**
+globs: runtime/paper_results/experiments/**
 alwaysApply: false
 ---
 

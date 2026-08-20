@@ -6,7 +6,7 @@ This app does not merge upstream into the app tree.
 | Path | Source |
 |------|--------|
 | `vendor/kronos` | https://github.com/shiyu-coder/Kronos.git |
-| `src/paper` | This application (paper trading / research) |
+| `src/*` | Application packages (`config`, `inference`, `data`, `universes`, `ranking`, `trading`, `forecast`) |
 | `scripts/` | App CLIs |
 
 ## Clone / init
@@ -38,11 +38,11 @@ Dry-run (fetch only, no checkout):
 
 ## Import bridge
 
-App code loads Kronos via `paper.kronos_vendor.ensure_vendor_on_path()`, which puts
+App code loads Kronos via `inference.vendor.ensure_vendor_on_path()`, which puts
 `vendor/kronos` on `sys.path` so `from model import Kronos, ...` works.
 
 Do **not** patch files under `vendor/kronos` for app defaults (e.g. `sample_count`).
-Set those in `src/paper` (see `DEFAULT_SAMPLE_COUNT` in `signals.py`).
+Set those in `src/inference` (see `DEFAULT_SAMPLE_COUNT` in `signals.py`).
 
 ## Attribution
 

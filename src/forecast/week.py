@@ -10,9 +10,10 @@ from typing import Any
 
 import pandas as pd
 
-from paper.sizing import conviction, normalize_weights
+from trading.sizing import conviction, normalize_weights
+from config.paths import PAPER_RESULTS
 
-RESULTS = Path(__file__).resolve().parents[2] / "paper_results"
+RESULTS = PAPER_RESULTS
 FORECASTS = RESULTS / "forecasts"
 WEEKS = FORECASTS / "weeks"
 CURRENT_WEEK_FILE = FORECASTS / "CURRENT_WEEK.txt"

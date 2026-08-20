@@ -9,7 +9,7 @@ from dataclasses import asdict, dataclass, replace
 import numpy as np
 import pandas as pd
 
-from paper.signals import Signal, DEFAULT_SAMPLE_COUNT
+from inference.signals import Signal, DEFAULT_SAMPLE_COUNT
 
 
 @dataclass(frozen=True)

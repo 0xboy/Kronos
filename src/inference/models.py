@@ -11,8 +11,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
-PRETRAINED_DIR = ROOT / "pretrained"
+from config.paths import PRETRAINED as PRETRAINED_DIR
+from config.paths import REPO_ROOT as ROOT
 
 # Short CLI / paper names → Hugging Face id or local checkpoint path.
 MODEL_ALIASES: dict[str, str] = {
@@ -35,7 +35,7 @@ _HF_TO_LOCAL_NAME = {
 
 
 def _prefer_local(hf_or_path: str) -> str:
-    """Use repo pretrained/<name> when config.json is present (offline-safe)."""
+    """Use repo runtime/pretrained/<name> when config.json is present (offline-safe)."""
     key = str(hf_or_path).strip()
     local_name = _HF_TO_LOCAL_NAME.get(key)
     if local_name is None:

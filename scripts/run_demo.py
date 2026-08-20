@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import torch
 
-from paper.kronos_vendor import ensure_vendor_on_path, vendor_kronos_root
+from inference.vendor import ensure_vendor_on_path, vendor_kronos_root
 
 ensure_vendor_on_path()
 from model import Kronos, KronosTokenizer, KronosPredictor  # noqa: E402
@@ -16,7 +16,7 @@ from model import Kronos, KronosTokenizer, KronosPredictor  # noqa: E402
 ROOT = Path(__file__).resolve().parents[1]  # repo root
 VENDOR = vendor_kronos_root()
 DATA = VENDOR / "tests" / "data" / "regression_input.csv"
-OUT = ROOT / "paper_results" / "demos" / "forecast_demo.png"
+OUT = ROOT / "runtime" / "paper_results" / "demos" / "forecast_demo.png"
 
 LOOKBACK = 400
 PRED_LEN = 60

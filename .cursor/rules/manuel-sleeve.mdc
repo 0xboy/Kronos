@@ -1,10 +1,10 @@
 ---
 description: Trive manuel BIST sleeve canlı kuralları
-globs: paper_results/manual_sleeve/**
+globs: runtime/paper_results/manual_sleeve/**
 alwaysApply: false
 ---
 
-Manuel sleeve: `paper_results/manual_sleeve/RULES.md`.
+Manuel sleeve: `runtime/paper_results/manual_sleeve/RULES.md`.
 Kelly yedek kapalı (`RULES_deferred.md`) — kullanıcı “Kelly’ye geç” demeden yok.
 Erken-hit yeniden koşu açık (bölüm 4). **Her gün** hit kontrolü (4a): son **veya high** >= pred → hit_seen.
 High değdiyse hedef gelmiş sayılır; 4b → pozitif yoksa **FULL sat** (son geri çekilse de).

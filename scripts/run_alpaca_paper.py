@@ -11,7 +11,7 @@ Portfolio sleeve:
   --notional 0      → deploy all account cash/equity into score-weighted rebalance (default)
   --notional N      → cap sleeve at $N; rebalance within that book
   --no-rebalance    → old behavior: only sell negatives + buy new names with leftover cash
-  Only positions recorded in paper_results/sleeve_ledger.json are managed.
+  Only positions recorded in runtime/paper_results/sleeve_ledger.json are managed.
 """
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]  # repo root
 
-from paper.broker import (
+from trading.broker import (
     account_snapshot,
     list_positions,
     make_trading_client,
@@ -35,13 +35,13 @@ from paper.broker import (
     submit_market_sell,
     wait_for_orders,
 )
-from paper.config import load_settings
-from paper.data import (
+from config.settings import load_settings
+from data.bars import (
     drop_split_discontinuities,
     fetch_daily_bars,
     make_data_client,
 )
-from paper.ledger import (
+from trading.ledger import (
     DEFAULT_PATH as LEDGER_DEFAULT,
     drop_holding,
     holding_qty,
@@ -51,17 +51,17 @@ from paper.ledger import (
     record_sell,
     save_ledger,
 )
-from paper.models import DEFAULT_PAPER_MODEL, model_label, resolve_model_id
-from paper.signals import DEFAULT_SAMPLE_COUNT, device_summary, load_predictor, score_symbol
-from paper.sizing import allocate_budget, conviction, plan_rebalance
-from paper.universe import UNIVERSE_100
+from inference.models import DEFAULT_PAPER_MODEL, model_label, resolve_model_id
+from inference.signals import DEFAULT_SAMPLE_COUNT, device_summary, load_predictor, score_symbol
+from trading.sizing import allocate_budget, conviction, plan_rebalance
+from universes.universe import UNIVERSE_100
 
 
 def seed_ledger_from_latest_run(ledger: dict, broker_syms: set[str]) -> list[str]:
     """If sleeve is empty, adopt historical submit buys still held at the broker."""
     if holding_symbols(ledger):
         return []
-    runs = sorted((ROOT / "paper_results" / "runs").glob("run_*.json"), reverse=True)
+    runs = sorted((ROOT / "runtime" / "paper_results" / "runs").glob("run_*.json"), reverse=True)
     claimed: set[str] = set()
     seeded: list[str] = []
     for path in runs:
@@ -198,7 +198,7 @@ def _mark_kept_value(
             total += float(alpaca_by_sym[sym]["market_value"])
             continue
         # fallback: ledger qty * last signal/close
-        from paper.ledger import load_ledger as _  # noqa: F401 — avoid circular; use caller qty map
+        from trading.ledger import load_ledger as _  # noqa: F401 — avoid circular; use caller qty map
 
         px = signal_price.get(sym)
         if px is None:
@@ -751,7 +751,7 @@ def main() -> int:
         "skipped": [{"symbol": s, "reason": r} for s, r in skipped],
     }
 
-    out_dir = ROOT / "paper_results" / "runs"
+    out_dir = ROOT / "runtime" / "paper_results" / "runs"
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / f"run_{run_id}.json"
     out_path.write_text(json.dumps(out, indent=2), encoding="utf-8")

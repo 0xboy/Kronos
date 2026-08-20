@@ -6,7 +6,7 @@ Each list is curated liquid names (not full board). Yahoo suffixes:
 """
 from __future__ import annotations
 
-from paper.universe import SPUS100, XK100
+from universes.universe import SPUS100, XK100
 
 # 1) US — SPUS100 (already Yahoo-native)
 # 2) BIST — XK100 as .IS
