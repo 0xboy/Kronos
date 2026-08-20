@@ -20,7 +20,6 @@ runtime/          Local runtime (gitignored contents)
   yahoo_cache/    Disk OHLCV cache
   paper_results/  Runs, forecasts, ledger, ops
   pretrained/     Optional local HF weights
-  samples/        Small sample CSVs (tracked)
 ```
 
 See [docs/VENDOR.md](docs/VENDOR.md) for submodule sync.

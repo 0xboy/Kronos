@@ -79,7 +79,7 @@ temp/
 tmp/
 .python-version
 
-# Local runtime artifacts (samples/ is tracked)
+# Local runtime artifacts
 runtime/yahoo_cache/
 runtime/paper_results/
 runtime/pretrained/
