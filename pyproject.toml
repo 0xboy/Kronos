@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kronos-paper"
+version = "0.1.0"
+description = "Paper trading and research app on top of vendored Kronos"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy",
+    "pandas==2.2.2",
+    "torch>=2.0.0",
+    "einops==0.8.1",
+    "huggingface_hub==0.33.1",
+    "matplotlib==3.9.3",
+    "tqdm==4.67.1",
+    "safetensors==0.6.2",
+    "alpaca-py>=0.43.0",
+    "python-dotenv>=1.0.0",
+    "yfinance",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+paper = ["model_registry.json"]

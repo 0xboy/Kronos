@@ -13,7 +13,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]  # repo root
-sys.path.insert(0, str(ROOT))
 
 RESULTS = ROOT / "paper_results"
 FORECASTS = RESULTS / "forecasts"

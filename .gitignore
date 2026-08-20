@@ -57,8 +57,7 @@ Desktop.ini
 *.safetensors
 pretrained/
 
-# Fine-tune run artifacts (keep configs in git; weights stay local/Drive)
-finetune_csv/finetuned/
+# Fine-tune run artifacts live under vendor/kronos when used there
 
 # Logs
 *.log
@@ -83,5 +82,3 @@ tmp/
 # Local paper trading / research artifacts
 paper_results/
 data/yahoo_cache/
-webui/prediction_results/
-figures/demos/

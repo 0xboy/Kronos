@@ -21,7 +21,6 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 ROOT = Path(__file__).resolve().parents[1]  # repo root
-sys.path.insert(0, str(ROOT))
 
 from paper.models import DEFAULT_PAPER_MODEL
 

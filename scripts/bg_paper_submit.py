@@ -9,7 +9,6 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 ROOT = Path(__file__).resolve().parents[1]  # repo root
-sys.path.insert(0, str(ROOT))
 
 from paper.broker import make_trading_client, market_is_open
 from paper.config import load_settings

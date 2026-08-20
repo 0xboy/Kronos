@@ -8,11 +8,15 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import torch
 
-from model import Kronos, KronosTokenizer, KronosPredictor
+from paper.kronos_vendor import ensure_vendor_on_path, vendor_kronos_root
+
+ensure_vendor_on_path()
+from model import Kronos, KronosTokenizer, KronosPredictor  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]  # repo root
-DATA = ROOT / "tests" / "data" / "regression_input.csv"
-OUT = ROOT / "figures" / "demos" / "forecast_demo.png"
+VENDOR = vendor_kronos_root()
+DATA = VENDOR / "tests" / "data" / "regression_input.csv"
+OUT = ROOT / "paper_results" / "demos" / "forecast_demo.png"
 
 LOOKBACK = 400
 PRED_LEN = 60
@@ -21,6 +25,11 @@ PRED_LEN = 60
 def main():
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"Device: {device}")
+
+    if not DATA.is_file():
+        raise FileNotFoundError(
+            f"Demo data missing at {DATA}. Run: git submodule update --init --recursive"
+        )
 
     print("Loading tokenizer + Kronos-small from Hugging Face...")
     tokenizer = KronosTokenizer.from_pretrained("NeoQuasar/Kronos-Tokenizer-base")

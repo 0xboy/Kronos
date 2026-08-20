@@ -1,12 +1,6 @@
-numpy
-pandas
-# Prefer CUDA build on NVIDIA machines (CPU wheel silently disables GPU):
-#   pip install torch --index-url https://download.pytorch.org/whl/cu128
-torch>=2.0.0
-
-einops==0.8.1
-huggingface_hub==0.33.1
-matplotlib==3.9.3
-pandas==2.2.2
-tqdm==4.67.1
-safetensors==0.6.2
+# Prefer installing the app package (includes these deps):
+#   .venv\Scripts\python.exe -m pip install -e .
+#
+# Prefer CUDA torch on NVIDIA machines (CPU wheel silently disables GPU):
+#   .venv\Scripts\python.exe -m pip install --force-reinstall torch --index-url https://download.pytorch.org/whl/cu128
+-e .

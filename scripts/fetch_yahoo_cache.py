@@ -22,7 +22,6 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]  # repo root
-sys.path.insert(0, str(ROOT))
 
 from paper.commodities import COMMODITY_LABELS, get_commodity_try_gram_bars
 from paper.crypto import CRYPTO_LABELS
