@@ -8,7 +8,7 @@ Layout:
 from __future__ import annotations
 
 import json
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 import pandas as pd
@@ -216,6 +216,97 @@ def scan_cache_discontinuities(
         if jump > max_abs_ret:
             bad.append({"symbol": sym, "max_abs_ret": round(jump, 4), "path": str(csv_path(universe, sym))})
     return bad
+
+
+def _tail_needs_align(
+    cached: pd.DataFrame | None,
+    yahoo: pd.DataFrame,
+    *,
+    n_bars: int = 10,
+    rel_tol: float = 0.001,
+) -> bool:
+    """True if cache last N session bars disagree with a fresh Yahoo pull."""
+    if cached is None or cached.empty or yahoo is None or yahoo.empty:
+        return True
+    y = yahoo.tail(n_bars).copy()
+    y["timestamps"] = pd.to_datetime(y["timestamps"]).dt.normalize()
+    c = cached.copy()
+    c["timestamps"] = pd.to_datetime(c["timestamps"]).dt.normalize()
+    overlap = c.merge(y[["timestamps", "close"]], on="timestamps", how="inner", suffixes=("_c", "_y"))
+    if len(overlap) != len(y):
+        return True
+    denom = overlap["close_y"].abs().clip(lower=1e-9)
+    rel = (overlap["close_c"] - overlap["close_y"]).abs() / denom
+    return bool((rel > rel_tol).any())
+
+
+def _merge_tail(cached: pd.DataFrame | None, yahoo: pd.DataFrame, *, n_bars: int = 10) -> pd.DataFrame:
+    """Replace cache rows from the first of Yahoo's last N bars onward."""
+    y = yahoo.tail(n_bars).copy()
+    y["timestamps"] = pd.to_datetime(y["timestamps"]).dt.tz_localize(None)
+    if cached is None or cached.empty:
+        return y.reset_index(drop=True)
+    c = cached.copy()
+    c["timestamps"] = pd.to_datetime(c["timestamps"]).dt.tz_localize(None)
+    cut = pd.to_datetime(y["timestamps"].iloc[0])
+    kept = c[c["timestamps"] < cut]
+    merged = pd.concat([kept, y], ignore_index=True)
+    merged = (
+        merged.drop_duplicates(subset=["timestamps"], keep="last")
+        .sort_values("timestamps")
+        .reset_index(drop=True)
+    )
+    return merged[COLS]
+
+
+def align_last_bars(
+    universe: str,
+    symbols: list[str],
+    *,
+    n_bars: int = 10,
+    force: bool = False,
+    lookback_calendar_days: int = 45,
+    rel_tol: float = 0.001,
+) -> dict[str, pd.DataFrame]:
+    """Align only the last ``n_bars`` if they disagree with Yahoo (session checks).
+
+    Full history is kept. Symbols already matching Yahoo's last N closes/dates
+    are left untouched unless ``force=True``.
+    """
+    symbols = list(symbols)
+    n_bars = max(1, int(n_bars))
+    start = (date.today() - timedelta(days=lookback_calendar_days)).isoformat()
+    print(
+        f"Align tail: last {n_bars} bars for {len(symbols)} symbols "
+        f"(yahoo start={start}, force={force})..."
+    )
+    fresh = download_yahoo(symbols, start=start)
+    out: dict[str, pd.DataFrame] = {}
+    updated = skipped = missing = 0
+    for sym in symbols:
+        ydf = fresh.get(sym)
+        cdf = load_symbol(universe, sym)
+        if ydf is None or ydf.empty:
+            missing += 1
+            if cdf is not None:
+                out[sym] = cdf
+            continue
+        if not force and not _tail_needs_align(cdf, ydf, n_bars=n_bars, rel_tol=rel_tol):
+            skipped += 1
+            out[sym] = cdf if cdf is not None else ydf
+            continue
+        if cdf is None or cdf.empty:
+            # No long history on disk — fall back to full floor pull for this symbol.
+            full = download_yahoo([sym], start=DEFAULT_HISTORY_START).get(sym)
+            merged = full if full is not None else ydf
+        else:
+            merged = _merge_tail(cdf, ydf, n_bars=n_bars)
+        save_symbol(universe, sym, merged)
+        out[sym] = merged
+        updated += 1
+    print(f"Align tail done: updated={updated} skipped_ok={skipped} yahoo_missing={missing}")
+    _write_manifest(universe, symbols, out)
+    return out
 
 
 def get_yahoo_bars(

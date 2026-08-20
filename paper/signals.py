@@ -15,6 +15,9 @@ from paper.models import (
     resolve_tokenizer_id,
 )
 
+# Paper / live scoring default: average this many Kronos paths.
+DEFAULT_SAMPLE_COUNT = 10
+
 
 @dataclass
 class Signal:
@@ -24,7 +27,7 @@ class Signal:
     expected_return: float
     bars: int
     return_std: float = 0.0
-    sample_count: int = 1
+    sample_count: int = DEFAULT_SAMPLE_COUNT
     score: float = 0.0
 
 
@@ -113,7 +116,7 @@ def score_symbol(
     df: pd.DataFrame,
     lookback: int = 400,
     pred_len: int = 1,
-    sample_count: int = 1,
+    sample_count: int = DEFAULT_SAMPLE_COUNT,
 ) -> Signal | None:
     if len(df) < lookback:
         return None

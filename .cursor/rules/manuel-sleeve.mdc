@@ -6,5 +6,11 @@ alwaysApply: false
 
 Manuel sleeve: `paper_results/manual_sleeve/RULES.md`.
 Kelly yedek kapalı (`RULES_deferred.md`) — kullanıcı “Kelly’ye geç” demeden yok.
-Erken-hit yeniden koşu açık (bölüm 4). Hit’te yeni pred > son ise satma. Taban/tavan alınmaz. Kitapta olan top3’e ek serbest.
+Erken-hit yeniden koşu açık (bölüm 4). **Her gün** hit kontrolü (4a): son **veya high** >= pred → hit_seen.
+High değdiyse hedef gelmiş sayılır; 4b → pozitif yoksa **FULL sat** (son geri çekilse de).
+Hit’te yeni pred > son **ve** μ>0 ise tut; değilse **FULL sat**.
+Taban/tavan alınmaz. Kitapta olan top3’e ek serbest (cap %20 aşımı nakit).
+**Koşudan önce** Yahoo: `fetch_yahoo_cache.py --universe xk100 --refresh --max-age-days 0` — stale last yasak.
+Açık satır: maliyet + pred ort (qty-ağırlıklı); dilim/satış ayrı yazılmaz (§5).
+Skor: `DEFAULT_SAMPLE_COUNT=10` (tüm evrenler / Alpaca paper).
 Alpaca paper karışmaz. Kesir lot sleeve hesabına girmez.

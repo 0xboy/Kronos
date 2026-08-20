@@ -42,7 +42,7 @@ def main():
         pred_len=PRED_LEN,
         T=1.0,
         top_p=0.9,
-        sample_count=1,
+        sample_count=10,
         verbose=True,
     )
 

@@ -9,7 +9,7 @@ from dataclasses import asdict, dataclass, replace
 import numpy as np
 import pandas as pd
 
-from paper.signals import Signal
+from paper.signals import Signal, DEFAULT_SAMPLE_COUNT
 
 
 @dataclass(frozen=True)
@@ -18,7 +18,7 @@ class Xk100RankConfig:
     min_adv20_try: float = 500_000.0
     max_abs_expected: float = 0.15
     min_tstat: float = 0.5
-    sample_count: int = 5
+    sample_count: int = DEFAULT_SAMPLE_COUNT
     rank_mode: str = "vol_norm"  # mean_ret / vol_5d
     top_adv_pool: int = 50
     pred_len: int = 5

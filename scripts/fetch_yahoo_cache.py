@@ -10,6 +10,9 @@
   .venv/Scripts/python.exe scripts/fetch_yahoo_cache.py --universe both
   .venv/Scripts/python.exe scripts/fetch_yahoo_cache.py --universe crypto --start 2020-01-01
   .venv/Scripts/python.exe scripts/fetch_yahoo_cache.py --universe commodities --start 2020-01-01
+
+  # session / experiment checks: realign last 10 bars only if wrong
+  .venv/Scripts/python.exe scripts/fetch_yahoo_cache.py --universe xk100 --align-tail 10
 """
 from __future__ import annotations
 
@@ -27,6 +30,7 @@ from paper.top_exchanges import EXCHANGES, TOP10_IDS
 from paper.universe import SPUS100, XK100
 from paper.yahoo_cache import (
     CACHE_ROOT,
+    align_last_bars,
     check_cache,
     get_yahoo_bars,
     purge_universe_cache,
@@ -58,6 +62,21 @@ def parse_args() -> argparse.Namespace:
         "--purge",
         action="store_true",
         help="Delete universe CSV cache before download (implies refresh)",
+    )
+    p.add_argument(
+        "--align-tail",
+        type=int,
+        nargs="?",
+        const=10,
+        default=None,
+        metavar="N",
+        help="Realign last N daily bars from Yahoo only if they disagree (default N=10). "
+        "For session/experiment checks; keeps long history.",
+    )
+    p.add_argument(
+        "--force-align",
+        action="store_true",
+        help="With --align-tail, rewrite tails even when they already match",
     )
     p.add_argument("--max-age-days", type=int, default=1)
     p.add_argument(
@@ -118,7 +137,17 @@ def run_one(universe: str, args: argparse.Namespace) -> dict:
         print(f"Purged {n} cached CSV files under {cache_id}")
         args.refresh = True
 
-    if cache_id == "commodities":
+    if args.align_tail is not None:
+        if cache_id == "commodities":
+            raise SystemExit("--align-tail not supported for commodities (use --refresh)")
+        bars = align_last_bars(
+            cache_id,
+            syms,
+            n_bars=int(args.align_tail),
+            force=bool(args.force_align),
+        )
+        report = check_cache(cache_id, syms)
+    elif cache_id == "commodities":
         bars = get_commodity_try_gram_bars(
             period=period,
             start=start,

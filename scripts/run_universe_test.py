@@ -23,7 +23,7 @@ sys.path.insert(0, str(ROOT))
 from paper.commodities import COMMODITY_META, get_commodity_try_gram_bars
 from paper.crypto import CRYPTO_META
 from paper.models import DEFAULT_PAPER_MODEL
-from paper.signals import device_summary, load_predictor, score_symbol
+from paper.signals import DEFAULT_SAMPLE_COUNT, device_summary, load_predictor, score_symbol
 from paper.universe import COMMODITIES, CRYPTO, SPUS100, XK100
 from paper.xk100_rank import DEFAULT_CFG, cfg_to_dict, rank_signals
 from paper.yahoo_cache import get_yahoo_bars
@@ -40,7 +40,7 @@ def parse_args() -> argparse.Namespace:
         "--sample-count",
         type=int,
         default=0,
-        help="Kronos sample paths (0 = 1 for most markets, DEFAULT_CFG for xk100)",
+        help=f"Kronos sample paths (0 = {DEFAULT_SAMPLE_COUNT} for all markets)",
     )
     p.add_argument(
         "--model",
@@ -152,10 +152,8 @@ def main() -> int:
     use_xk100_rank = args.universe == "xk100"
     if args.sample_count and args.sample_count > 0:
         sample_count = args.sample_count
-    elif use_xk100_rank:
-        sample_count = DEFAULT_CFG.sample_count
     else:
-        sample_count = 1
+        sample_count = DEFAULT_SAMPLE_COUNT
     xk_cfg = DEFAULT_CFG if use_xk100_rank else None
     if use_xk100_rank:
         print(
@@ -163,6 +161,8 @@ def main() -> int:
             f"min_adv20={xk_cfg.min_adv20_try} max_abs_exp={xk_cfg.max_abs_expected} "
             f"min_tstat={xk_cfg.min_tstat} sample_count={sample_count}"
         )
+    else:
+        print(f"sample_count={sample_count}")
 
     signals = []
     skipped = []

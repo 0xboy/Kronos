@@ -1,0 +1,19 @@
+---
+description: Seans/experiment hit check öncesi Yahoo cache son 10 bar hizalama
+globs: paper_results/experiments/**
+alwaysApply: false
+---
+
+# Yahoo cache — seans / experiment check
+
+Experiment hit / yön-hedef check veya seans içi fiyat kontrolünden **önce**:
+
+```text
+.venv/Scripts/python.exe scripts/fetch_yahoo_cache.py --universe xk100 --align-tail 10
+```
+
+- Son **10** günlük barı Yahoo ile karşılaştırır; **sadece yanlış/eksik** olanları yazar (tarih veya close sapması).
+- Uzun history’ye dokunmaz. Zorla yazmak için: `--force-align`.
+- Check’te ham `yfinance.download` kullanma — cache hizalandıktan sonra cache/Yahoo last üzerinden skorla.
+- Resmi kapanış check’i için BIST **≥18:00** sonrası aynı komut; seans içi last “geçici” kabul et, rapora not düş.
+- Full wipe/`--refresh` bu iş için değil; sleeve koşusu hâlâ `manuel-sleeve` kuralındaki refresh’i kullanır.

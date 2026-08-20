@@ -115,7 +115,7 @@ class Config:
         self.inference_T = 0.6
         self.inference_top_p = 0.9
         self.inference_top_k = 0
-        self.inference_sample_count = 5
+        self.inference_sample_count = 10
         self.backtest_batch_size = 1000
         self.backtest_benchmark = self._set_benchmark(self.instrument)
 

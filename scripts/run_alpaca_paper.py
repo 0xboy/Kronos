@@ -53,7 +53,7 @@ from paper.ledger import (
     save_ledger,
 )
 from paper.models import DEFAULT_PAPER_MODEL, model_label, resolve_model_id
-from paper.signals import device_summary, load_predictor, score_symbol
+from paper.signals import DEFAULT_SAMPLE_COUNT, device_summary, load_predictor, score_symbol
 from paper.sizing import allocate_budget, conviction, plan_rebalance
 from paper.universe import UNIVERSE_100
 
@@ -102,6 +102,12 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--limit", type=int, default=0, help="Use first N symbols (0 = all 100)")
     p.add_argument("--lookback", type=int, default=400)
     p.add_argument("--pred-len", type=int, default=1, help="Forecast horizon in trading days")
+    p.add_argument(
+        "--sample-count",
+        type=int,
+        default=DEFAULT_SAMPLE_COUNT,
+        help=f"Kronos sample paths to average (default {DEFAULT_SAMPLE_COUNT})",
+    )
     p.add_argument("--min-return", type=float, default=0.01, help="Min predicted return to buy")
     p.add_argument(
         "--sell-below",
@@ -296,6 +302,7 @@ def main() -> int:
                 df,
                 lookback=args.lookback,
                 pred_len=args.pred_len,
+                sample_count=args.sample_count,
             )
         except Exception as exc:  # noqa: BLE001 — keep batch running
             skipped.append((symbol, str(exc)))
@@ -715,6 +722,7 @@ def main() -> int:
         "params": {
             "lookback": args.lookback,
             "pred_len": args.pred_len,
+            "sample_count": args.sample_count,
             "min_return": args.min_return,
             "sell_below": args.sell_below,
             "top_k": args.top_k,

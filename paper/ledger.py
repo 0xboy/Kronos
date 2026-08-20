@@ -171,3 +171,42 @@ def drop_holding(ledger: dict[str, Any], symbol: str, *, reason: str, run_id: st
             "note": reason,
         }
     )
+
+
+def restore_holding(
+    ledger: dict[str, Any],
+    *,
+    symbol: str,
+    qty: float,
+    avg_cost: float,
+    opened_at: str | None = None,
+    reason: str = "restored_at_broker",
+    run_id: str | None = None,
+) -> None:
+    """Re-add a name that reappeared at the broker after a sync_drop (no trade)."""
+    qty = float(qty)
+    avg_cost = float(avg_cost)
+    if qty <= 0:
+        return
+    cost_basis = qty * avg_cost
+    holdings = ledger.setdefault("holdings", {})
+    holdings[symbol] = {
+        "qty": qty,
+        "avg_cost": avg_cost,
+        "cost_basis": cost_basis,
+        "opened_at": opened_at or _now(),
+    }
+    ledger.setdefault("trades", []).append(
+        {
+            "ts": _now(),
+            "side": "sync_restore",
+            "symbol": symbol,
+            "qty": qty,
+            "price": avg_cost,
+            "notional": round(cost_basis, 2),
+            "order_id": None,
+            "expected_return": None,
+            "run_id": run_id,
+            "note": reason,
+        }
+    )
