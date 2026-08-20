@@ -6,7 +6,7 @@ This app does not merge upstream into the app tree.
 | Path | Source |
 |------|--------|
 | `vendor/kronos` | https://github.com/shiyu-coder/Kronos.git |
-| `src/*` | Application packages (`config`, `inference`, `data`, `universes`, `ranking`, `trading`, `forecast`) |
+| `src/*` | Application packages (`config`, `inference`, `data`, `universe`, `ranking`, `trading`, `forecast`) |
 | `scripts/` | App CLIs |
 
 ## Clone / init

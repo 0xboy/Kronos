@@ -1,0 +1,48 @@
+{
+  "name": "commodities",
+  "fx_yahoo": "USDTRY=X",
+  "items": {
+    "GOLD": {
+      "yahoo": "GC=F",
+      "name": "Alt\u0131n",
+      "unit_src": "usd_per_troy_oz",
+      "divisor_g": 31.1034768
+    },
+    "SILVER": {
+      "yahoo": "SI=F",
+      "name": "G\u00fcm\u00fc\u015f",
+      "unit_src": "usd_per_troy_oz",
+      "divisor_g": 31.1034768
+    },
+    "PLATINUM": {
+      "yahoo": "PL=F",
+      "name": "Platin",
+      "unit_src": "usd_per_troy_oz",
+      "divisor_g": 31.1034768
+    },
+    "PALLADIUM": {
+      "yahoo": "PA=F",
+      "name": "Paladyum",
+      "unit_src": "usd_per_troy_oz",
+      "divisor_g": 31.1034768
+    },
+    "COPPER": {
+      "yahoo": "HG=F",
+      "name": "Bak\u0131r",
+      "unit_src": "usd_per_lb",
+      "divisor_g": 453.59237
+    },
+    "ALUMINUM": {
+      "yahoo": "ALI=F",
+      "name": "Al\u00fcminyum",
+      "unit_src": "usd_per_tonne",
+      "divisor_g": 1000000.0
+    },
+    "ZINC": {
+      "yahoo": "ZNC=F",
+      "name": "\u00c7inko",
+      "unit_src": "usd_per_tonne",
+      "divisor_g": 1000000.0
+    }
+  }
+}

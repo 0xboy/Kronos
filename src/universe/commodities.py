@@ -1,5 +1,6 @@
 """Commodity bars as TRY per gram (Yahoo futures × USDTRY).
 
+Membership / meta: ``universe/commodities.json``.
 Precious metals: USD/troy oz → TRY/g
 Copper (HG=F): USD/lb → TRY/g
 Aluminum / Zinc: USD/metric tonne → TRY/g
@@ -10,60 +11,17 @@ from typing import Any
 
 import pandas as pd
 
-from data.yahoo_cache import COLS, download_yahoo, get_yahoo_bars, save_symbol
+from data.yahoo_cache import COLS, get_yahoo_bars, save_symbol
+from universe.loader import load_json
 
 TROY_OZ_G = 31.1034768
 LB_G = 453.59237
 TONNE_G = 1_000_000.0
 
-# label -> meta (yahoo futures contract + unit for TL/gram conversion)
-COMMODITY_META: dict[str, dict[str, Any]] = {
-    "GOLD": {
-        "yahoo": "GC=F",
-        "name": "Altın",
-        "unit_src": "usd_per_troy_oz",
-        "divisor_g": TROY_OZ_G,
-    },
-    "SILVER": {
-        "yahoo": "SI=F",
-        "name": "Gümüş",
-        "unit_src": "usd_per_troy_oz",
-        "divisor_g": TROY_OZ_G,
-    },
-    "PLATINUM": {
-        "yahoo": "PL=F",
-        "name": "Platin",
-        "unit_src": "usd_per_troy_oz",
-        "divisor_g": TROY_OZ_G,
-    },
-    "PALLADIUM": {
-        "yahoo": "PA=F",
-        "name": "Paladyum",
-        "unit_src": "usd_per_troy_oz",
-        "divisor_g": TROY_OZ_G,
-    },
-    "COPPER": {
-        "yahoo": "HG=F",
-        "name": "Bakır",
-        "unit_src": "usd_per_lb",
-        "divisor_g": LB_G,
-    },
-    "ALUMINUM": {
-        "yahoo": "ALI=F",
-        "name": "Alüminyum",
-        "unit_src": "usd_per_tonne",
-        "divisor_g": TONNE_G,
-    },
-    "ZINC": {
-        "yahoo": "ZNC=F",
-        "name": "Çinko",
-        "unit_src": "usd_per_tonne",
-        "divisor_g": TONNE_G,
-    },
-}
-
+_payload = load_json("commodities")
+COMMODITY_META: dict[str, dict[str, Any]] = dict(_payload["items"])
 COMMODITY_LABELS = list(COMMODITY_META.keys())
-FX_YAHOO = "USDTRY=X"
+FX_YAHOO = str(_payload.get("fx_yahoo") or "USDTRY=X")
 UNIVERSE_ID = "commodities"
 
 

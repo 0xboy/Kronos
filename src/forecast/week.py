@@ -10,11 +10,10 @@ from typing import Any
 
 import pandas as pd
 
+from config.paths import FORECASTS, PAPER_RESULTS
 from trading.sizing import conviction, normalize_weights
-from config.paths import PAPER_RESULTS
 
-RESULTS = PAPER_RESULTS
-FORECASTS = RESULTS / "forecasts"
+RESULTS = PAPER_RESULTS  # legacy alias; prefer FORECASTS / TESTS from paths
 WEEKS = FORECASTS / "weeks"
 CURRENT_WEEK_FILE = FORECASTS / "CURRENT_WEEK.txt"
 

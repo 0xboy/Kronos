@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import torch
 
-from config.paths import PAPER_RESULTS
+from config.paths import DEMOS
 from inference.vendor import ensure_vendor_on_path, vendor_kronos_root
 
 ensure_vendor_on_path()
@@ -18,7 +18,7 @@ from model import Kronos, KronosTokenizer, KronosPredictor  # noqa: E402
 
 VENDOR = vendor_kronos_root()
 DATA = VENDOR / "tests" / "data" / "regression_input.csv"
-OUT = PAPER_RESULTS / "demos" / "forecast_demo.png"
+OUT = DEMOS / "forecast_demo.png"
 
 LOOKBACK = 400
 PRED_LEN = 60

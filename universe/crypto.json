@@ -1,0 +1,306 @@
+{
+  "name": "crypto",
+  "notes": "Prefer numbered Yahoo feeds when plain ticker is stale (ARB/APT/SUI/UNI).",
+  "items": {
+    "BTC-USD": {
+      "name": "Bitcoin"
+    },
+    "ETH-USD": {
+      "name": "Ethereum"
+    },
+    "BNB-USD": {
+      "name": "BNB"
+    },
+    "SOL-USD": {
+      "name": "Solana"
+    },
+    "XRP-USD": {
+      "name": "XRP"
+    },
+    "ADA-USD": {
+      "name": "Cardano"
+    },
+    "DOGE-USD": {
+      "name": "Dogecoin"
+    },
+    "TRX-USD": {
+      "name": "TRON"
+    },
+    "AVAX-USD": {
+      "name": "Avalanche"
+    },
+    "DOT-USD": {
+      "name": "Polkadot"
+    },
+    "LINK-USD": {
+      "name": "Chainlink"
+    },
+    "LTC-USD": {
+      "name": "Litecoin"
+    },
+    "BCH-USD": {
+      "name": "Bitcoin Cash"
+    },
+    "UNI7083-USD": {
+      "name": "Uniswap"
+    },
+    "APT21794-USD": {
+      "name": "Aptos"
+    },
+    "SUI20947-USD": {
+      "name": "Sui"
+    },
+    "ICP-USD": {
+      "name": "Internet Computer"
+    },
+    "NEAR-USD": {
+      "name": "NEAR Protocol"
+    },
+    "ATOM-USD": {
+      "name": "Cosmos"
+    },
+    "XLM-USD": {
+      "name": "Stellar"
+    },
+    "ETC-USD": {
+      "name": "Ethereum Classic"
+    },
+    "FIL-USD": {
+      "name": "Filecoin"
+    },
+    "HBAR-USD": {
+      "name": "Hedera"
+    },
+    "ARB11841-USD": {
+      "name": "Arbitrum"
+    },
+    "OP-USD": {
+      "name": "Optimism"
+    },
+    "VET-USD": {
+      "name": "VeChain"
+    },
+    "ALGO-USD": {
+      "name": "Algorand"
+    },
+    "AAVE-USD": {
+      "name": "Aave"
+    },
+    "SAND-USD": {
+      "name": "The Sandbox"
+    },
+    "MANA-USD": {
+      "name": "Decentraland"
+    },
+    "SHIB-USD": {
+      "name": "Shiba Inu"
+    },
+    "TON-USD": {
+      "name": "Toncoin"
+    },
+    "INJ-USD": {
+      "name": "Injective"
+    },
+    "RENDER-USD": {
+      "name": "Render"
+    },
+    "FET-USD": {
+      "name": "Artificial Superintelligence"
+    },
+    "WIF-USD": {
+      "name": "dogwifhat"
+    },
+    "BONK-USD": {
+      "name": "Bonk"
+    },
+    "FLOKI-USD": {
+      "name": "FLOKI"
+    },
+    "SEI-USD": {
+      "name": "Sei"
+    },
+    "TIA-USD": {
+      "name": "Celestia"
+    },
+    "JUP-USD": {
+      "name": "Jupiter"
+    },
+    "WLD-USD": {
+      "name": "Worldcoin"
+    },
+    "PYTH-USD": {
+      "name": "Pyth Network"
+    },
+    "JTO-USD": {
+      "name": "Jito"
+    },
+    "ONDO-USD": {
+      "name": "Ondo"
+    },
+    "ENA-USD": {
+      "name": "Ethena"
+    },
+    "STRK-USD": {
+      "name": "Starknet"
+    },
+    "MKR-USD": {
+      "name": "Maker"
+    },
+    "SNX-USD": {
+      "name": "Synthetix"
+    },
+    "CRV-USD": {
+      "name": "Curve DAO"
+    },
+    "LDO-USD": {
+      "name": "Lido DAO"
+    },
+    "RUNE-USD": {
+      "name": "THORChain"
+    },
+    "THETA-USD": {
+      "name": "Theta Network"
+    },
+    "EOS-USD": {
+      "name": "EOS"
+    },
+    "XTZ-USD": {
+      "name": "Tezos"
+    },
+    "FLOW-USD": {
+      "name": "Flow"
+    },
+    "EGLD-USD": {
+      "name": "MultiversX"
+    },
+    "KAVA-USD": {
+      "name": "Kava"
+    },
+    "ZEC-USD": {
+      "name": "Zcash"
+    },
+    "DASH-USD": {
+      "name": "Dash"
+    },
+    "XMR-USD": {
+      "name": "Monero"
+    },
+    "QNT-USD": {
+      "name": "Quant"
+    },
+    "AXS-USD": {
+      "name": "Axie Infinity"
+    },
+    "CHZ-USD": {
+      "name": "Chiliz"
+    },
+    "ENJ-USD": {
+      "name": "Enjin Coin"
+    },
+    "BAT-USD": {
+      "name": "Basic Attention"
+    },
+    "ZIL-USD": {
+      "name": "Zilliqa"
+    },
+    "IOTA-USD": {
+      "name": "IOTA"
+    },
+    "NEO-USD": {
+      "name": "Neo"
+    },
+    "WAVES-USD": {
+      "name": "Waves"
+    },
+    "KSM-USD": {
+      "name": "Kusama"
+    },
+    "ROSE-USD": {
+      "name": "Oasis"
+    },
+    "CFX-USD": {
+      "name": "Conflux"
+    },
+    "MINA-USD": {
+      "name": "Mina"
+    },
+    "ASTR-USD": {
+      "name": "Astar"
+    },
+    "DYDX-USD": {
+      "name": "dYdX"
+    },
+    "BLUR-USD": {
+      "name": "Blur"
+    },
+    "APE-USD": {
+      "name": "ApeCoin"
+    },
+    "LPT-USD": {
+      "name": "Livepeer"
+    },
+    "ENS-USD": {
+      "name": "Ethereum Name Service"
+    },
+    "1INCH-USD": {
+      "name": "1inch"
+    },
+    "YFI-USD": {
+      "name": "yearn.finance"
+    },
+    "SUSHI-USD": {
+      "name": "SushiSwap"
+    },
+    "CAKE-USD": {
+      "name": "PancakeSwap"
+    },
+    "GALA-USD": {
+      "name": "Gala"
+    },
+    "KAS-USD": {
+      "name": "Kaspa"
+    },
+    "JASMY-USD": {
+      "name": "JasmyCoin"
+    },
+    "CORE-USD": {
+      "name": "Core"
+    },
+    "AKT-USD": {
+      "name": "Akash"
+    },
+    "AR-USD": {
+      "name": "Arweave"
+    },
+    "ONE-USD": {
+      "name": "Harmony"
+    },
+    "ANKR-USD": {
+      "name": "Ankr"
+    },
+    "SKL-USD": {
+      "name": "Skale"
+    },
+    "STORJ-USD": {
+      "name": "Storj"
+    },
+    "HOT-USD": {
+      "name": "Holo"
+    },
+    "QTUM-USD": {
+      "name": "Qtum"
+    },
+    "ZRX-USD": {
+      "name": "0x"
+    },
+    "BAND-USD": {
+      "name": "Band Protocol"
+    },
+    "IOTX-USD": {
+      "name": "IoTeX"
+    },
+    "PENDLE-USD": {
+      "name": "Pendle"
+    }
+  }
+}

@@ -1,6 +1,6 @@
 """Score Kronos on one universe at a time (SPUS100, XK100, commodities, or crypto).
 
-Uses Yahoo data from disk cache (runtime/yahoo_cache/) — no re-download each run.
+Uses Yahoo data from disk cache (runtime/data/yahoo_cache/) — no re-download each run.
 Markets stay separate. Commodities are priced in TRY per gram; crypto in USD.
 
   python main.py cache          # once
@@ -11,18 +11,18 @@ Markets stay separate. Commodities are priced in TRY per gram; crypto in USD.
 """
 from __future__ import annotations
 
-from config.paths import PAPER_RESULTS
+from config.paths import TESTS
 import argparse
 import json
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-from universes.commodities import COMMODITY_META, get_commodity_try_gram_bars
-from universes.crypto import CRYPTO_META
 from inference.models import DEFAULT_PAPER_MODEL
 from inference.signals import DEFAULT_SAMPLE_COUNT, device_summary, load_predictor, score_symbol
-from universes.universe import COMMODITIES, CRYPTO, SPUS100, XK100
+from universe.catalog import COMMODITIES, CRYPTO, SPUS100, XK100
+from universe.commodities import COMMODITY_META, get_commodity_try_gram_bars
+from universe.crypto import CRYPTO_META
 from ranking.xk100_rank import DEFAULT_CFG, cfg_to_dict, rank_signals
 from data.yahoo_cache import get_yahoo_bars
 from data.bars import drop_split_discontinuities
@@ -268,7 +268,7 @@ def main() -> int:
         "skipped": skipped,
         "filter_drops": filter_drops,
     }
-    out_dir = PAPER_RESULTS / "tests"
+    out_dir = TESTS
     out_dir.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     path = out_dir / f"test_{market['id']}_{stamp}.json"

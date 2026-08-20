@@ -60,7 +60,7 @@ from trading.rebalance import (
     sleeve_kept_value,
 )
 from trading.sizing import allocate_budget, conviction, plan_rebalance
-from universes.universe import UNIVERSE_100
+from universe.catalog import UNIVERSE_100
 
 ROOT = REPO_ROOT
 

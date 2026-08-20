@@ -81,5 +81,12 @@ tmp/
 
 # Local runtime artifacts
 runtime/yahoo_cache/
+runtime/data/
 runtime/paper_results/
 runtime/pretrained/
+runtime/universe/
+runtime/forecasts/
+runtime/tests/
+runtime/experiments/
+runtime/manual_sleeve/
+runtime/demos/

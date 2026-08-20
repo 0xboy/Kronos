@@ -1,9 +1,9 @@
 """Yahoo daily OHLCV cache — download once, reuse for Kronos tests.
 
 Layout:
-  runtime/yahoo_cache/spus/AAPL.csv
-  runtime/yahoo_cache/xk100/ASELS_IS.csv
-  runtime/yahoo_cache/spus/manifest.json
+  runtime/data/yahoo_cache/spus/AAPL.csv
+  runtime/data/yahoo_cache/xk100/ASELS_IS.csv
+  runtime/data/yahoo_cache/spus/manifest.json
 """
 from __future__ import annotations
 

@@ -1,31 +1,46 @@
+"""Typed app settings (Alpaca paper trading) via pydantic-settings."""
 from __future__ import annotations
 
-import os
-from dataclasses import dataclass
+from functools import lru_cache
 
-from dotenv import load_dotenv
+from pydantic import Field, field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from config.paths import REPO_ROOT
 
-ROOT = REPO_ROOT
 
+class Settings(BaseSettings):
+    """Loaded from process env and optional repo-root ``.env``."""
 
-@dataclass(frozen=True)
-class Settings:
-    api_key: str
-    secret_key: str
-    paper: bool = True
+    model_config = SettingsConfigDict(
+        env_file=REPO_ROOT / ".env",
+        env_file_encoding="utf-8",
+        env_ignore_empty=True,
+        extra="ignore",
+    )
+
+    api_key: str = Field(default="", validation_alias="ALPACA_API_KEY")
+    secret_key: str = Field(default="", validation_alias="ALPACA_SECRET_KEY")
+    paper: bool = Field(default=True, validation_alias="ALPACA_PAPER")
+
+    @field_validator("api_key", "secret_key", mode="before")
+    @classmethod
+    def _strip_str(cls, value: object) -> object:
+        if isinstance(value, str):
+            return value.strip()
+        return value
 
     @property
     def configured(self) -> bool:
-        return bool(self.api_key.strip() and self.secret_key.strip())
+        return bool(self.api_key and self.secret_key)
+
+
+@lru_cache(maxsize=1)
+def get_settings() -> Settings:
+    """Cached settings instance (invalidate via ``get_settings.cache_clear()``)."""
+    return Settings()
 
 
 def load_settings() -> Settings:
-    load_dotenv(ROOT / ".env")
-    paper_raw = os.getenv("ALPACA_PAPER", "true").strip().lower()
-    return Settings(
-        api_key=os.getenv("ALPACA_API_KEY", "").strip(),
-        secret_key=os.getenv("ALPACA_SECRET_KEY", "").strip(),
-        paper=paper_raw in {"1", "true", "yes", "y"},
-    )
+    """Compatibility wrapper used by CLIs."""
+    return get_settings()

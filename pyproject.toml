@@ -19,6 +19,7 @@ dependencies = [
     "safetensors==0.6.2",
     "alpaca-py>=0.43.0",
     "python-dotenv>=1.0.0",
+    "pydantic-settings>=2.0.0",
     "yfinance",
 ]
 
@@ -32,7 +33,7 @@ include = [
     "config*",
     "inference*",
     "data*",
-    "universes*",
+    "universe*",
     "ranking*",
     "trading*",
     "forecast*",

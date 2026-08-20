@@ -12,16 +12,23 @@ src/
   config/         Settings + paths
   inference/      Kronos vendor bridge, models, scoring
   data/           Yahoo cache + Alpaca bars helpers
-  universes/      SPUS, XK100, commodities, crypto
+  universe/       Catalogs + special pricing (commodities TRY/g, …)
   ranking/        XK100 filters / conviction ranking
   trading/        Alpaca broker, sizing, sleeve ledger, rebalance
   forecast/       Weekly forecast cards / reports
 scripts/          Ops helpers (e.g. sync_vendor.ps1)
+universe/         Editable membership JSON (spus100, xk100, commodities, crypto, exchanges)
 vendor/kronos/    Official Kronos submodule
 runtime/          Local runtime (gitignored contents)
-  yahoo_cache/    Disk OHLCV cache
-  paper_results/  Runs, forecasts, ledger, ops
+  data/           Provider OHLCV caches (yahoo_cache/, …)
   pretrained/     Optional local HF weights
+  universe/       Optional local list overrides
+  forecasts/      Weekly cards / prediction reports
+  tests/          Universe score + cache-check JSON
+  experiments/    Ad-hoc research sessions
+  manual_sleeve/  Trive / manual BIST sleeve
+  demos/          Demo plot outputs
+  paper_results/  Alpaca paper only (runs, ops, ledger)
 ```
 
 See [docs/VENDOR.md](docs/VENDOR.md) for submodule sync.
@@ -38,6 +45,9 @@ git submodule update --init --recursive
 ```
 
 Copy `.env.example` → `.env` and set Alpaca keys for paper trading.
+
+Membership: edit [`universe/*.json`](universe/) (or drop overrides in
+`runtime/universe/`). Special conversion logic stays in `src/universe/`.
 
 ## Common commands
 

@@ -16,16 +16,16 @@
 """
 from __future__ import annotations
 
-from config.paths import PAPER_RESULTS
+from config.paths import TESTS
 import argparse
 import json
 import sys
 from pathlib import Path
 
-from universes.commodities import COMMODITY_LABELS, get_commodity_try_gram_bars
-from universes.crypto import CRYPTO_LABELS
-from universes.top_exchanges import EXCHANGES, TOP10_IDS
-from universes.universe import SPUS100, XK100
+from universe.catalog import SPUS100, XK100
+from universe.commodities import COMMODITY_LABELS, get_commodity_try_gram_bars
+from universe.crypto import CRYPTO_LABELS
+from universe.exchanges import EXCHANGES, TOP10_IDS
 from data.yahoo_cache import (
     CACHE_ROOT,
     align_last_bars,
@@ -200,7 +200,7 @@ def main() -> int:
         universes = [args.universe]
 
     reports = {u: run_one(u, args) for u in universes}
-    out = PAPER_RESULTS / "tests" / "yahoo_cache_check.json"
+    out = TESTS / "yahoo_cache_check.json"
     out.parent.mkdir(exist_ok=True)
     out.write_text(json.dumps(reports, indent=2), encoding="utf-8")
     print(f"Cache root: {CACHE_ROOT}")

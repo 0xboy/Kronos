@@ -1,0 +1,526 @@
+"""Freeze prediction cards and score them vs live Yahoo after the horizon."""
+from __future__ import annotations
+
+import json
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+import pandas as pd
+import yfinance as yf
+
+from config.paths import FORECASTS, YAHOO_CACHE
+from forecast.week import (
+    archive_current_week,
+    format_sleeve_block,
+    iso_week_id,
+    live_path,
+    sleeve_example,
+)
+from inference.models import DEFAULT_PAPER_MODEL
+from universe.commodities import COMMODITY_META
+from universe.crypto import CRYPTO_META
+
+
+def live_artifact_paths() -> tuple[Path, Path, Path]:
+    """Resolve live card / check / report txt paths for the current week."""
+    return (
+        live_path("forecast_card.json"),
+        live_path("forecast_check.json"),
+        live_path("forecast_report.txt"),
+    )
+
+
+def default_from_report() -> Path:
+    for cand in (
+        live_path("prediction_report_all.json"),
+        live_path("prediction_report_top.json"),
+        FORECASTS / "prediction_report_all.json",
+        FORECASTS / "prediction_report_top.json",
+    ):
+        if cand.exists():
+            return cand
+    return live_path("prediction_report_all.json")
+
+
+def horizon_end(asof: str, n: int = 5) -> str:
+    start = pd.Timestamp(asof)
+    days = pd.bdate_range(start=start + pd.Timedelta(days=1), periods=n)
+    return str(days[-1].date())
+
+
+def fmt_pct(x: float | None) -> str:
+    if x is None:
+        return "   n/a"
+    return f"{x:+6.2f}%"
+
+
+def fmt_price(x: float | None, *, digits: int = 2) -> str:
+    if x is None:
+        return "n/a"
+    ax = abs(float(x))
+    if ax > 0 and ax < 0.01:
+        return f"{x:.8f}".rstrip("0").rstrip(".")
+    if ax >= 100:
+        return f"{x:,.{digits}f}"
+    if ax >= 1:
+        return f"{x:.{digits}f}"
+    return f"{x:.4f}"
+
+
+def crypto_display_symbol(sym: str) -> str:
+    raw = sym.replace("-USD", "")
+    mapping = {
+        "APT21794": "APT",
+        "SUI20947": "SUI",
+        "ARB11841": "ARB",
+        "UNI7083": "UNI",
+    }
+    for long, short in mapping.items():
+        if raw == long or raw.startswith(long):
+            return short
+    if raw.startswith("APT"):
+        return "APT"
+    if raw.startswith("SUI"):
+        return "SUI"
+    return raw
+
+
+def _asof_from_cache(fallback: str = "2026-07-30") -> str:
+    asof = fallback
+    for sample in (
+        YAHOO_CACHE / "commodities" / "GOLD.csv",
+        YAHOO_CACHE / "spus" / "NVDA.csv",
+    ):
+        try:
+            if sample.exists():
+                df = pd.read_csv(sample)
+                asof = str(pd.to_datetime(df["timestamps"]).max().date())
+                break
+        except Exception:
+            pass
+    return asof
+
+
+def freeze_card(report_path: Path) -> Path:
+    """Lock current top predictions into ``forecast_card.json`` and write txt."""
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    asof = _asof_from_cache()
+
+    card: dict[str, Any] = {
+        "frozen_at": datetime.now(timezone.utc).isoformat(),
+        "model": report.get("model"),
+        "pred_len_days": report.get("pred_len_days", 5),
+        "asof_last_close": asof,
+        "target_check_date": horizon_end(asof, report.get("pred_len_days", 5)),
+        "rule": (
+            "After target_check_date, compare Yahoo close vs pred_close. "
+            "Commodities: Yahoo futures × USDTRY → TRY/g. "
+            "Direction hit = actual_return and expected_return same sign. "
+            "Abs error = |actual_return - expected_return|."
+        ),
+        "markets": {},
+    }
+
+    for key in ("spus", "xk100", "commodities", "crypto"):
+        if key not in report:
+            continue
+        block = report[key]
+        picks = []
+        for row in block["top10"]:
+            if key == "spus":
+                yahoo = row["symbol"]
+            elif key == "xk100":
+                yahoo = f"{row['symbol']}.IS"
+            elif key == "crypto":
+                yahoo = row.get("yahoo") or CRYPTO_META.get(row["symbol"], {}).get("yahoo") or row["symbol"]
+            else:
+                yahoo = row.get("yahoo") or COMMODITY_META.get(row["symbol"], {}).get("yahoo")
+            picks.append(
+                {
+                    "rank": row["rank"],
+                    "symbol": row["symbol"],
+                    "name": row.get("name"),
+                    "yahoo": yahoo,
+                    "unit": row.get("unit")
+                    or ("TRY/g" if key == "commodities" else "USD" if key == "crypto" else None),
+                    "last_close": row["last_close"],
+                    "pred_close": row["pred_close"],
+                    "expected_return_pct": row["expected_return_pct"],
+                }
+            )
+        card["markets"][key] = {
+            "currency": block["market"]["currency"],
+            "exchange": block["market"].get("exchange"),
+            "unit": block["market"].get("unit"),
+            "source_run": block.get("source_run"),
+            "rank_rule": block.get("rank_rule"),
+            "picks": picks,
+        }
+
+    FORECASTS.mkdir(parents=True, exist_ok=True)
+    out_card, _, _ = live_artifact_paths()
+    out_card.parent.mkdir(parents=True, exist_ok=True)
+    out_card.write_text(json.dumps(card, indent=2, ensure_ascii=False), encoding="utf-8")
+    write_forecast_report_txt(card, check=None, source_report=report)
+    wid = iso_week_id(card.get("asof_last_close"))
+    archive_current_week(week_id=wid, asof=card.get("asof_last_close"))
+    return out_card
+
+
+def write_forecast_report_txt(
+    card: dict,
+    *,
+    check: dict | None = None,
+    source_report: dict | None = None,
+) -> Path:
+    """Human-readable tracker matching forecast_report.txt style."""
+    lines: list[str] = []
+    model = (card.get("model") or DEFAULT_PAPER_MODEL).replace("NeoQuasar/", "")
+    asof = card.get("asof_last_close", "?")
+    target = card.get("target_check_date", "?")
+    status = (check or {}).get("status")
+    week_id = iso_week_id(asof if asof != "?" else None)
+    lines += [
+        "Kronos 5-day forecast card",
+        "==========================",
+        f"Model: {model}",
+        f"Week: {week_id}",
+        f"As-of close: {asof}",
+        f"Check after: {target}",
+        "Horizon: next 5 trading days",
+        "Rule: did price move in the predicted direction?",
+    ]
+    if status:
+        lines.append(f"Check status: {status} (today={(check or {}).get('today', '?')})")
+    lines.append("")
+
+    check_mkts = (check or {}).get("markets") or {}
+
+    def _hit_cols(cp: dict | None, *, digits: int = 2) -> str:
+        if not cp or cp.get("direction_hit") is None:
+            return f"  {'n/a':>10}  {'n/a':>8}  ?"
+        hit = "HIT" if cp["direction_hit"] else "MISS"
+        return (
+            f"  {fmt_price(cp.get('actual_close'), digits=digits):>10}  "
+            f"{fmt_pct(cp.get('actual_return_pct')):>8}  {hit}"
+        )
+
+    def section_equity(key: str, title: str, last_hdr: str, pred_hdr: str) -> None:
+        block = card.get("markets", {}).get(key)
+        if not block:
+            return
+        picks = block["picks"]
+        scored = check_mkts.get(key)
+        lines.append("-" * 72)
+        lines.append(title)
+        if key == "xk100" and block.get("rank_rule"):
+            lines.append("Rank: vol_norm + min_price/ADV + |exp| cap + min t-stat")
+        lines.append("-" * 72)
+        if scored:
+            lines.append(
+                f"#   Symbol   Expected     Last {last_hdr:4}  Pred {pred_hdr:4}  "
+                f"Actual {last_hdr:4}   Actual%   Hit"
+            )
+        else:
+            lines.append(f"#   Symbol   Expected     Last {last_hdr:4}  Pred {pred_hdr:4}")
+        for p in picks:
+            row = f"{p['rank']:<3} {p['symbol']:<8} {fmt_pct(p['expected_return_pct']):>8}  "
+            row += f"{fmt_price(p['last_close']):>10}  {fmt_price(p['pred_close']):>10}"
+            if scored:
+                cp = next((x for x in scored["picks"] if x["symbol"] == p["symbol"]), None)
+                row += _hit_cols(cp)
+            lines.append(row)
+        watch = ", ".join(p["symbol"] for p in picks[:5])
+        lines.append("")
+        lines.append(f"Top 5 to watch: {watch}")
+        if scored and scored.get("direction_hit_rate") is not None:
+            lines.append(
+                f"Score: {scored['direction_hits']}/{scored['scored']} "
+                f"({scored['direction_hit_rate']*100:.0f}%) "
+                f"MAE={scored['mean_abs_error_pct_points']} pp"
+            )
+        if not scored:
+            currency = "USD" if key == "spus" else "TRY"
+            budget = 10_000.0
+            alloc = sleeve_example(picks, budget=budget, currency=currency)
+            lines.extend(
+                format_sleeve_block(
+                    f"  Sleeve {key.upper()}",
+                    alloc,
+                    budget=budget,
+                    currency=currency,
+                )
+            )
+        lines.append("")
+
+    section_equity("spus", "SPUS (US / USD) — Top 10", "$", "$")
+    section_equity("xk100", "XK100 (BIST Katılım / TRY) — Top 10", "₺", "₺")
+
+    cmd = card.get("markets", {}).get("commodities")
+    if cmd:
+        lines.append("-" * 72)
+        lines.append("COMMODITIES (TRY / gram) — All 7")
+        lines.append(f"As-of close: {asof} | Check after: {target}")
+        lines.append("Source: COMEX/LME futures × USDTRY → TL/gram")
+        lines.append("-" * 72)
+        scored = check_mkts.get("commodities")
+        if scored:
+            lines.append(
+                "#   Symbol      Name         Expected     Last ₺/g     Pred ₺/g  "
+                "Actual ₺/g   Actual%   Hit"
+            )
+        else:
+            lines.append("#   Symbol      Name         Expected     Last ₺/g     Pred ₺/g")
+        for p in cmd["picks"]:
+            name = (p.get("name") or "")[:10]
+            row = (
+                f"{p['rank']:<3} {p['symbol']:<11} {name:<12} "
+                f"{fmt_pct(p['expected_return_pct']):>8}  "
+                f"{fmt_price(p['last_close'], digits=4):>10}  "
+                f"{fmt_price(p['pred_close'], digits=4):>10}"
+            )
+            if scored:
+                cp = next((x for x in scored["picks"] if x["symbol"] == p["symbol"]), None)
+                row += _hit_cols(cp, digits=4)
+            lines.append(row)
+        watch = ", ".join(p["symbol"] for p in cmd["picks"][:5])
+        lines.append("")
+        lines.append(f"Top 5 to watch: {watch}")
+        if scored and scored.get("direction_hit_rate") is not None:
+            lines.append(
+                f"Score: {scored['direction_hits']}/{scored['scored']} "
+                f"({scored['direction_hit_rate']*100:.0f}%) "
+                f"MAE={scored['mean_abs_error_pct_points']} pp"
+            )
+        if not scored:
+            pos = [p for p in cmd["picks"] if float(p.get("expected_return_pct", 0)) > 0]
+            alloc = sleeve_example(
+                pos or cmd["picks"],
+                budget=10_000.0,
+                currency="TRY",
+                fractional=True,
+                qty_decimals=2,
+            )
+            lines.extend(
+                format_sleeve_block(
+                    "  Sleeve COMMODITIES",
+                    alloc,
+                    budget=10_000.0,
+                    currency="TRY",
+                    qty_unit="g",
+                )
+            )
+        lines.append("")
+
+    crypto_block = card.get("markets", {}).get("crypto")
+    crypto_picks = None
+    crypto_all = None
+    if crypto_block and crypto_block.get("picks"):
+        crypto_picks = crypto_block["picks"]
+    elif source_report and source_report.get("crypto", {}).get("top10"):
+        crypto_picks = source_report["crypto"]["top10"]
+        crypto_all = source_report["crypto"].get("all_ranked")
+    else:
+        for path in (
+            FORECASTS / "prediction_report_all.json",
+            FORECASTS / "prediction_report_crypto.json",
+        ):
+            if not path.exists():
+                continue
+            try:
+                blob = json.loads(path.read_text(encoding="utf-8"))
+                if blob.get("crypto", {}).get("top10"):
+                    crypto_picks = blob["crypto"]["top10"]
+                    crypto_all = blob["crypto"].get("all_ranked")
+                    break
+            except Exception:
+                pass
+
+    if crypto_picks:
+        lines.append("-" * 72)
+        lines.append("CRYPTO (USD) — Top 10")
+        lines.append("Source: Yahoo Finance -USD pairs (24/7)")
+        lines.append("-" * 72)
+        scored = check_mkts.get("crypto")
+        if scored:
+            lines.append(
+                "#   Symbol   Name            Expected     Last $       Pred $  "
+                "Actual $    Actual%   Hit"
+            )
+        else:
+            lines.append("#   Symbol   Name            Expected     Last $       Pred $")
+        for p in crypto_picks:
+            sym = crypto_display_symbol(p["symbol"])
+            name = (p.get("name") or "")[:14]
+            row = (
+                f"{p['rank']:<3} {sym:<8} {name:<14} "
+                f"{fmt_pct(p['expected_return_pct']):>8}  "
+                f"{fmt_price(p['last_close'], digits=4):>10}  "
+                f"{fmt_price(p['pred_close'], digits=4):>10}"
+            )
+            if scored:
+                cp = next((x for x in scored["picks"] if x["symbol"] == p["symbol"]), None)
+                row += _hit_cols(cp, digits=4)
+            lines.append(row)
+        majors = []
+        for row in crypto_all or []:
+            ds = crypto_display_symbol(row["symbol"])
+            if ds in ("BTC", "ETH"):
+                majors.append(
+                    f"{ds} {fmt_pct(row['expected_return_pct']).strip()} "
+                    f"({fmt_price(row['last_close'], digits=0)} → "
+                    f"{fmt_price(row['pred_close'], digits=0)})"
+                )
+        if majors:
+            lines.append("")
+            lines.append("Majors: " + " | ".join(majors))
+        watch = ", ".join(crypto_display_symbol(p["symbol"]) for p in crypto_picks[:5])
+        lines.append(f"Top 5 to watch: {watch}")
+        if scored and scored.get("direction_hit_rate") is not None:
+            lines.append(
+                f"Score: {scored['direction_hits']}/{scored['scored']} "
+                f"({scored['direction_hit_rate']*100:.0f}%) "
+                f"MAE={scored['mean_abs_error_pct_points']} pp"
+            )
+        if not scored:
+            alloc = sleeve_example(crypto_picks, budget=10_000.0, currency="USD")
+            for a in alloc:
+                a["symbol"] = crypto_display_symbol(a["symbol"])
+            lines.extend(
+                format_sleeve_block("  Sleeve CRYPTO", alloc, budget=10_000.0, currency="USD")
+            )
+        lines.append("")
+
+    lines.append("-" * 72)
+    lines.append("Note: These are model forecasts, not guarantees.")
+    lines.append(f"Week archive: runtime/forecasts/weeks/{week_id}/")
+    lines.append(f"After {target} run:  python main.py forecast-track --check")
+    lines.append("(check refreshes this txt with Actual close + Actual% / Hit)")
+    lines.append("")
+
+    _, _, report_txt = live_artifact_paths()
+    report_txt.parent.mkdir(parents=True, exist_ok=True)
+    body = "\n".join(lines)
+    report_txt.write_text(body, encoding="utf-8")
+    (FORECASTS / "forecast_report.txt").write_text(body, encoding="utf-8")
+    return report_txt
+
+
+def latest_close(yahoo: str) -> tuple[float | None, str | None]:
+    data = yf.download(yahoo, period="15d", auto_adjust=True, progress=False, threads=False)
+    if data is None or data.empty or "Close" not in data.columns:
+        return None, None
+    close = data["Close"].dropna()
+    if close.empty:
+        return None, None
+    if isinstance(close, pd.DataFrame):
+        close = close.iloc[:, 0]
+    ts = close.index[-1]
+    val = float(close.iloc[-1])
+    day = str(pd.Timestamp(ts).date())
+    return val, day
+
+
+def latest_try_per_gram(symbol: str, yahoo: str) -> tuple[float | None, str | None]:
+    """Convert live Yahoo futures close to TRY/gram (same rules as universe.commodities)."""
+    meta = COMMODITY_META.get(symbol)
+    if not meta:
+        return None, None
+    usd, day = latest_close(yahoo or meta["yahoo"])
+    fx, _ = latest_close("USDTRY=X")
+    if usd is None or fx is None:
+        return None, day
+    return usd * fx / float(meta["divisor_g"]), day
+
+
+def check_card(*, refresh: bool = False) -> Path:  # noqa: ARG001 — reserved
+    """Score frozen card vs live Yahoo and refresh report txt."""
+    card_path, check_path, _ = live_artifact_paths()
+    if not card_path.exists() and (FORECASTS / "forecast_card.json").exists():
+        card_path = FORECASTS / "forecast_card.json"
+    if not card_path.exists():
+        raise FileNotFoundError(
+            f"No forecast card. Run: python main.py forecast-track --freeze\nMissing: {card_path}"
+        )
+
+    card = json.loads(card_path.read_text(encoding="utf-8"))
+    target = card["target_check_date"]
+    today = str(pd.Timestamp.now(tz="UTC").tz_localize(None).date())
+    too_early = today < target
+
+    out: dict[str, Any] = {
+        "checked_at": datetime.now(timezone.utc).isoformat(),
+        "card": str(card_path.name),
+        "asof_last_close": card["asof_last_close"],
+        "target_check_date": target,
+        "today": today,
+        "status": "early" if too_early else "ready",
+        "note": (
+            f"Target not reached yet (today={today} < {target}). Showing interim prices."
+            if too_early
+            else "Horizon reached — scoring vs Yahoo closes."
+        ),
+        "markets": {},
+    }
+
+    for mkt, block in card["markets"].items():
+        rows = []
+        direction_hits = 0
+        scored = 0
+        unit = block.get("unit") or ""
+        for p in block["picks"]:
+            if mkt == "commodities" or p.get("unit") == "TRY/g" or unit == "gram":
+                actual, actual_day = latest_try_per_gram(p["symbol"], p.get("yahoo") or "")
+            else:
+                actual, actual_day = latest_close(p["yahoo"])
+            row = {
+                **p,
+                "actual_close": None,
+                "actual_day": actual_day,
+                "actual_return_pct": None,
+                "error_pct_points": None,
+                "direction_hit": None,
+                "price_vs_pred": None,
+            }
+            if actual is not None and p["last_close"]:
+                actual_ret = (actual / p["last_close"] - 1.0) * 100.0
+                exp = float(p["expected_return_pct"])
+                err = abs(actual_ret - exp)
+                same_dir = (actual_ret >= 0 and exp >= 0) or (actual_ret < 0 and exp < 0)
+                row.update(
+                    {
+                        "actual_close": round(actual, 4),
+                        "actual_return_pct": round(actual_ret, 2),
+                        "error_pct_points": round(err, 2),
+                        "direction_hit": bool(same_dir),
+                        "price_vs_pred": round(actual - float(p["pred_close"]), 4),
+                    }
+                )
+                scored += 1
+                if same_dir:
+                    direction_hits += 1
+            rows.append(row)
+
+        out["markets"][mkt] = {
+            "currency": block["currency"],
+            "unit": block.get("unit"),
+            "scored": scored,
+            "direction_hits": direction_hits,
+            "direction_hit_rate": round(direction_hits / scored, 3) if scored else None,
+            "mean_abs_error_pct_points": round(
+                sum(r["error_pct_points"] for r in rows if r["error_pct_points"] is not None)
+                / max(scored, 1),
+                2,
+            )
+            if scored
+            else None,
+            "picks": rows,
+        }
+
+    check_path.parent.mkdir(parents=True, exist_ok=True)
+    check_path.write_text(json.dumps(out, indent=2, ensure_ascii=False), encoding="utf-8")
+    write_forecast_report_txt(card, check=out)
+    wid = iso_week_id(card.get("asof_last_close"))
+    archive_current_week(week_id=wid, asof=card.get("asof_last_close"))
+    return check_path
